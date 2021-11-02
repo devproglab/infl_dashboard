@@ -1,0 +1,129 @@
+body {
+  background-color: rgba(225, 223, 221, 0.2);
+  min-height: 611px;
+  margin: 0;
+}
+
+.page-title {
+  padding: 5px 0px;
+}
+
+.card {
+  background: #fff;
+  padding: 8px 28px 8px 12px;
+  border-radius: 2px;
+  margin-bottom:5px;
+  background-clip: padding-box;
+  height: 125px;
+  position: relative;
+}
+
+.card-neutral {
+  background:#C7E0F4;
+}
+.card-bad {
+  background:#f9aab0;
+}
+.card-good {
+  background:#b0e3ab;
+}
+.card .icon i {
+    position: absolute;
+    top: 25px;
+    right: 15px;
+    font-size: 80px;
+    color: rgba(0, 0, 0, 0.15);
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: 355px 1fr;
+  grid-template-rows: 54px 0.05fr 1fr 45px;
+  grid-template-areas: "header header" "sidenav cards" "sidenav main" "footer footer";
+  height: 100vh;
+}
+
+.header {
+  grid-area: header;
+  background-color: #fff;
+  padding: 6px 0px 6px 10px;
+  display: flex;
+}
+
+.main {
+  grid-area: main;
+  background-color: #faf9f8;
+  padding-left: 40px;
+  padding-right: 32px;
+  max-width: calc(100vw - 400px);
+  max-height: calc(100vh - 100px);
+  overflow: auto;
+}
+
+.cards {
+  grid-area: cards;
+  margin-top: 20px;
+  background-color: #faf9f8;
+  padding-left: 40px;
+  padding-right: 32px;
+}
+
+.footer {
+  grid-area: footer;
+  background-color: #f3f2f1;
+  padding: 12px 20px;
+}
+
+.sidenav {
+  grid-area: sidenav;
+  background-color: #fff;
+  padding: 25px;
+  overflow-y:auto;
+}
+.sidenav::-webkit-scrollbar {
+  display: none!important;
+}
+.sidenav {
+  -ms-overflow-style: none!important;  
+  scrollbar-width: none!important;  
+}
+
+.title {
+  padding: 0px 14px 0px 14px;
+  color: #737373;
+  margin: 6px 0px 6px 10px;
+  border-left: 1px solid darkgray;
+  width: 300px;
+  font-size: 12px;
+}
+
+.logo {
+  height: 44px;
+}
+.main::-webkit-scrollbar {
+  display: none!important;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.main {
+  -ms-overflow-style: none!important;  /* IE and Edge */
+  scrollbar-width: none!important;  /* Firefox */
+}
+.ms-Nav-groupContent {
+  margin-bottom: 10px!important;
+}
+.model_choice:hover {
+  background: rgb(243, 242, 241);
+  color: rgb(32, 31, 30);
+}
+.model_choice {
+  cursor: pointer;
+  padding:7px;
+}
+.root-101 .ms-List-cell {
+  min-height: 0px!important;
+}
+.chosen_model {
+  background: rgb(243, 242, 241);
+  color: rgb(32, 31, 30);
+}
