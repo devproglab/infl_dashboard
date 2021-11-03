@@ -555,7 +555,7 @@ server <- function(input, output, session) {
     final <- final[order(final[,1], decreasing=TRUE),]
     final <- rbind(final, other)
     final <- cbind(rownames(final), final)
-    names(final) <- c('Фактор', 'Объясняющаяя способность', 'Накопленный вклад в цену')
+    names(final) <- c('ФакторOOOOOO', 'Объясняющаяя способность', 'Накопленный вклад в цену')
     final[,2] <- paste(final[,2], '%', sep='')
     final[,3] <- paste(final[,3], ' руб.', sep='')
     final
