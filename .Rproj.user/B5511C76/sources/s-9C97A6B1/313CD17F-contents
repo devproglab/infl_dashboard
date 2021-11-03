@@ -18,11 +18,11 @@ labelset <- clock_labels_lookup('ru')[[2]]
 labelset <- substr(labelset, 1, nchar(labelset) - 1)
 labelset[5] <- 'май'
 # Prepare color palette
-# palette <-
-#   adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f = 0.6)
-# hse_green = palette[3]
-# hse_red   =  palette[1]
-# hse_blue  = palette[2]
+palette <-
+  adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f = 0.6)
+hse_green = palette[3]
+hse_red   =  palette[1]
+hse_blue  = palette[2]
 # Prepare list of models
 model_groups <- read_xlsx('data_output/models/model_groups.xlsx')
 models <- substr(model_groups$model, 1, nchar(model_groups$model)-6)
@@ -133,7 +133,7 @@ header <- tagList(
   ),
   span(
     TooltipHost(
-      content = "Загрузка данных отображаемого графика в формате .xlsx",
+      content = "Загружает данные отображаемого графика в формате .xlsx",
       delay = 0,
     CommandBar(
     items = list(
@@ -144,6 +144,7 @@ header <- tagList(
 )
 # Sidebar navigation & product choice
 navigation <- tagList (
+ 
   Nav(
     groups = list(list(links = list(
       list(
@@ -236,9 +237,7 @@ yoy_page <- makePage(
   title = "Изменение цен",
   subtitle = "К аналогичному периоду предыдущего года",
   contents = div(
-    MessageBar("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
-Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
-                    , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
+    MessageBar('Lorem ipsum dolor sit amet,  deserunt mollit anim id est laborum', isMultiline=TRUE),
     span(downloadLink("download_yearly", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
     tags$table( width='100%',
       tags$thead(
@@ -258,12 +257,9 @@ mom_page <- makePage(
   title = "Изменение цен",
   subtitle = "К предыдущему периоду",
   contents = div(
-    MessageBar("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с предыдущим периодом - неделей или месяцем. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка, включая сезонность. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
-Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
-               , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
     span(downloadLink("download_monthly", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
     shinycssloaders::withSpinner(plotlyOutput('price_mom'), type =6),
-    style='height:600px;'
+    style='overflow:auto!important;'
     )
 )
 # Price structure page
@@ -271,12 +267,9 @@ struct_page <- makePage(
   title = "Структура потребительской цены",
   subtitle = "По данным Росстата",
   contents = div(
-    MessageBar("На данном графике представлена динамика средней цены выбранного товара в разбивке по основным статьям структуры розничной цены. 
-Эти статьи отражают вклад каждого из участников цепочки поставок в формирование конечной потребительской стоимости товара."
-               , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
     span(downloadLink("download_str", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
     shinycssloaders::withSpinner(plotlyOutput('price_structure'), type = 6),
-    style='height:600px;'
+    style='overflow:auto!important;'
     )
 )
 
@@ -294,7 +287,6 @@ ui <- fluentPage(
   useShinyjs(),
   tags$head(
     htmlOutput('toggler'),
-    tags$script(src='tooltiper.js', type="text/javascript"),
     tags$link(href = "style.css", rel = "stylesheet", type = "text/css"),
     tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css"),
     shiny_router_script_tag
@@ -336,7 +328,6 @@ server <- function(input, output, session) {
         shinyjs::runjs(script) 
         shinyjs::runjs(paste("$('[href=", '"', "#!/yoy", '"', "]').addClass('chosen_page')", sep = "")) 
         shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_yearly').attr('href');});") 
-
       }
       if (is_page('mom')) {
         script <- ''
@@ -368,7 +359,7 @@ server <- function(input, output, session) {
     ))
   })
   # Ensure the chosen model is constantly highlighted
-  shinyjs::runjs('setInterval( function(){highlight(); tips()}, 1)') 
+  shinyjs::runjs('setInterval( function(){highlight()}, 1)') 
   # Load the model for a product
   model <- reactive({
     req(input$prod_select)

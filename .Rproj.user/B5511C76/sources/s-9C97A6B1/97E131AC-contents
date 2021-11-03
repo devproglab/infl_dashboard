@@ -1,0 +1,9 @@
+function tips() {
+  setTimeout(function() {
+    if ($('td:contains("Сырое молоко"):last i').length == 0) {
+      $('td:contains("Сырое молоко"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip"><span class="tooltip-factor">Отпускные цены сырого молока в с/х</span></i>');
+    }
+    $('td:contains("Производственные издержки"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip"><span class="tooltip-factor">Изменение средних цен производителей в отрасли</span></i>');
+    $('td:contains("Инфляция спроса"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip"><span class="tooltip-factor">Изменение средних цен производителей в отрасли</span></i>');
+  }, 4000);
+}
