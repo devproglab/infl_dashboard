@@ -92,7 +92,9 @@ plotdecomp = function(model, yoy=1) {
       labs(fill='')
       
       t <- ggplotly(p, tooltip='text') %>% config(displayModeBar = F) %>%
-        layout(legend = list(orientation = "h", x = 0, y = -0.1)) %>% 
+        layout(legend = list(orientation = "h", x = 0, y = -0.1)) %>%
+               layout(plot_bgcolor  = "rgba(0, 0, 0, 0)",
+                      paper_bgcolor = "rgba(0, 0, 0, 0)") %>%
         config(locale = 'ru')
       t$x$data[[1]]$hoverinfo <- "none"
       # t <- t %>% layout(
@@ -168,6 +170,8 @@ plotdecomp = function(model, yoy=1) {
     
       t <- ggplotly(p, tooltip='text') %>% config(displayModeBar = F) %>%
         layout(legend = list(orientation = "h", x = 0, y = -0.1)) %>% 
+        layout(plot_bgcolor  = "rgba(0, 0, 0, 0)",
+               paper_bgcolor = "rgba(0, 0, 0, 0)") %>%
         config(locale = 'ru')
       t$x$data[[1]]$hoverinfo <- "none"
       # t <- t %>% layout(
@@ -249,6 +253,8 @@ plot_price_decomp <- function(estimated) {
     labs(fill='')
   t <- ggplotly(p, tooltip='text') %>% config(displayModeBar = F)  %>%
     layout(legend = list(orientation = "h", x = 0, y = -0.1)) %>% 
+    layout(plot_bgcolor  = "rgba(0, 0, 0, 0)",
+           paper_bgcolor = "rgba(0, 0, 0, 0)") %>%
     config(locale = 'ru')
   # t <- t %>% layout(
   #   xaxis = list(

@@ -127,16 +127,20 @@ lay <- function(mainUI) {
 #---------------------------------------------------------------------------------------------------
 # Header bar with logo and buttons
 header <- tagList(
-  img(src = "hse-logo.png", class = "logo"),
-  div(Text(variant = "xLarge", "Анализ потребительских цен"), class = "title"),
-  span(CommandBar(
+  div(class = 'logo-block',
+  Link(href = '/', img(src = "hse-logo.png", class = "logo")),
+  div(Link(href = '/', Text(variant = "xLarge", "Анализ потребительских цен"), class = 'title-link'), class = "title")
+  ),
+  span(
+    TooltipHost(
+      content = "Загружает данные отображаемого графика в формате .xlsx",
+      delay = 0,
+    CommandBar(
     items = list(
-      CommandBarItem("Поделиться ссылкой", "Share"),
-      CommandBarItem("Скачать данные", "Download")
+        CommandBarItem("Скачать", "Download", id="download")
     ),
-    farItems = list(CommandBarItem("Справка", "Info", iconOnly = TRUE)),
     style = list(width = "100%")
-  ), style = "margin-left: auto")
+  )), style = "margin-left: auto")
 )
 # Sidebar navigation & product choice
 navigation <- tagList (
@@ -230,22 +234,37 @@ home_page <- makePage(title = 'Факторный анализ потребит�
 yoy_page <- makePage(
   title = "Изменение цен",
   subtitle = "К аналогичному периоду предыдущего года",
-  contents = div(shinycssloaders::withSpinner(plotlyOutput('price_yoy'), type =
-                                                6))
+  contents = div(
+    span(downloadLink("download_yearly", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
+    tags$table( width='100%',
+      tags$thead(
+        tags$th('Динамика цен', width='60%'),
+        tags$th('Результаты моделирования, с 2015 года', width='40%')
+      ),
+      tags$tr(
+      tags$td(shinycssloaders::withSpinner(plotlyOutput('price_yoy'), type=6)),
+      tags$td(shinycssloaders::withSpinner(tableOutput('impacts'), type=6), valign='top')
+      )
+    )
+  )
 )
 # Period-over-period (w-o-w / m-o-m) inflation page
 mom_page <- makePage(
   title = "Изменение цен",
   subtitle = "К предыдущему периоду",
-  contents = div(shinycssloaders::withSpinner(plotlyOutput('price_mom'), type =
-                                                6))
+  contents = div(
+    span(downloadLink("download_monthly", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
+    shinycssloaders::withSpinner(plotlyOutput('price_mom'), type =6)
+    )
 )
 # Price structure page
 struct_page <- makePage(
   title = "Структура потребительской цены",
   subtitle = "По данным Росстата",
-  contents = div(shinycssloaders::withSpinner(plotlyOutput('price_structure'), type =
-                                                6))
+  contents = div(
+    span(downloadLink("download_str", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
+    shinycssloaders::withSpinner(plotlyOutput('price_structure'), type = 6)
+    )
 )
 
 #---------------------------------------------------------------------------------------------------
@@ -261,8 +280,7 @@ ui <- fluentPage(
   lay(router$ui),
   useShinyjs(),
   tags$head(
-    htmlOutput('cards_toggler'),
-    # htmlOutput('model_toggler'),
+    htmlOutput('toggler'),
     tags$link(href = "style.css", rel = "stylesheet", type = "text/css"),
     tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css"),
     shiny_router_script_tag
@@ -274,16 +292,59 @@ ui <- fluentPage(
 #---------------------------------------------------------------------------------------------------
 server <- function(input, output, session) {
   router$server(input, output, session)
-  # Hide value boxes on the main page
-  output$cards_toggler <- renderUI({
+  # JS workarounds
+  output$toggler <- renderUI({
     if (is_page('/')) {
-      tags$style('.cards {visibility:hidden!important; overflow:hidden!important;}')
+      # Disabling value boxes on the main page
+      shinyjs::runjs("$('.cards').css('visibility', 'hidden').css('overflow', 'hidden');") 
+      # Disabling download button
+      shinyjs::runjs("$('#download').css('display', 'none')") 
+      # Highlighting the page in the menu
+      script <- ''
+      for (i in c('yoy', 'mom', 'struct')) {
+        script <- paste(script, 
+                        paste("$('[href=", '"', "#!/", i, '"', "]').addClass('unchosen_page'); ", sep = ""), sep="")
+      }
+      shinyjs::runjs(script) 
+      shinyjs::runjs(paste("$('[href=", '"', "#!/", '"', "]').removeClass('unchosen_page').addClass('chosen_page')", sep = "")) 
     } else {
-      tags$style('.cards {visibility:visible!important; overflow:visible!important;}')
+      # Enabling value boxes on other pages
+      shinyjs::runjs("$('.cards').css('visibility', 'visible').css('overflow', 'visible');") 
+      # Enabling download button
+      shinyjs::runjs("$('#download').css('display', 'block')") 
+      # Highlighting pages in the menu
+      if (is_page('yoy')) {
+        script <- ''
+        for (i in c('', 'mom', 'struct')) {
+          script <- paste(script, 
+                      paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
+        }
+        shinyjs::runjs(script) 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/yoy", '"', "]').addClass('chosen_page')", sep = "")) 
+        shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_yearly').attr('href');});") 
+      }
+      if (is_page('mom')) {
+        script <- ''
+        for (i in c('', 'yoy', 'struct')) {
+          script <- paste(script, 
+                          paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
+        }
+        shinyjs::runjs(script) 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/mom", '"', "]').addClass('chosen_page')", sep = "")) 
+        shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_monthly').attr('href');});")
+      }
+      if (is_page('struct')) {
+        script <- ''
+        for (i in c('', 'mom', 'yoy')) {
+          script <- paste(script, 
+                          paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
+        }
+        shinyjs::runjs(script) 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/struct", '"', "]').addClass('chosen_page')", sep = "")) 
+        shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_str').attr('href');});") 
+      }
     }
-  })
-  # Logics for highlighting the chosen model
-  output$main_loader <- renderUI({
+    # Function to highlight the chosen model in the menu
     tags$script(HTML(
       paste("function highlight() {if ($('.chosen_model').length == 0) { $('[label=", '"', 
             model()$model_name, '"', "]').addClass('chosen_model')}
@@ -291,18 +352,8 @@ server <- function(input, output, session) {
             sep = "")
     ))
   })
-  shinyjs::runjs('
-  setInterval( function(){ 
-  highlight()}, 1)') 
-  # output$model_toggler <- renderUI({
-  #   script <- paste("$('.chosen_model').removeClass('chosen_model'); ",
-  #                   "$('[label=", '"', model()$model_name, '"', "]').addClass('chosen_model');",
-  #                   sep='')
-  #   tags$script(HTML(
-  #     script
-  #   ))
-  # })
-
+  # Ensure the chosen model is constantly highlighted
+  shinyjs::runjs('setInterval( function(){highlight()}, 1)') 
   # Load the model for a product
   model <- reactive({
     req(input$prod_select)
@@ -312,6 +363,7 @@ server <- function(input, output, session) {
   })
   # Create value boxes
   output$card_set <- renderUI({
+    # Load model data
     estimated <- model()
     weight = estimated$weight
     model_name <- estimated$model_name
@@ -320,23 +372,29 @@ server <- function(input, output, session) {
     price = round(last(estimated$df[[1]]), 2)
     
     if (weekly) {
+    # Sum up 4 latest data points for a weekly model + get forecast
       length <- nrow(estimated$dfmod_unsmoothed)
       period_change = sum(estimated$dfmod_unsmoothed[(length - n.ahead + 1 - 4):(length - n.ahead), 1])
       forecast_period = xts(t(colSums(round(estimated$forecast[2:5] * 100, 2))), order.by=zoo::index(estimated$forecast[5]))
     } else {
+    # Get the latest data point for a monthly model 
       period_change = nth(estimated$dfmod_unsmoothed[, 1],-(n.ahead + 1))
       forecast_period = round(estimated$forecast[2] * 100, 2)
     }
     
+    # Get y-o-y change and define ruble symbol
     yoy_change = nth(estimated$decomp2[, 1],-1)
     forecast_yoy = round(estimated$forecast2[2] * 100, 2)
     rub <- '\U20BD'
     
+    # Get date of the latest data point and create a label
     date_current = nth(zoo::index(estimated$dfmod_unsmoothed),-(n.ahead +
                                                                   1))
     label_current <-
       paste(day(as.Date(date_current)), ' ', labelset[month(as.Date(date_current))], '-', substr(year(as.Date(date_current)), 3, 4), sep =
               '')
+    
+    # Get date of the previous data point and create a label
     if (weekly) {
       date_prev_period = nth(zoo::index(estimated$dfmod_unsmoothed),-(n.ahead +
                                                                         5))
@@ -344,23 +402,23 @@ server <- function(input, output, session) {
       date_prev_period = nth(zoo::index(estimated$dfmod_unsmoothed),-(n.ahead +
                                                                         2))
     }
-    
     label_prev_period <-
       paste(day(as.Date(date_prev_period)), ' ', labelset[month(as.Date(date_prev_period))], '-', substr(year(as.Date(
         date_prev_period
       )), 3, 4), sep = '')
     
+    # Get date of the forecasted data point and create a label
     if (weekly) {
       date_fcast_period = as.Date(zoo::index(estimated$forecast[5]))
     } else {
       date_fcast_period = as.Date(zoo::index(forecast_period))
     }
-    
     label_fcast_period <-
       paste(day(as.Date(date_fcast_period)), ' ', labelset[month(as.Date(date_fcast_period))], '-', substr(year(as.Date(
         date_fcast_period
       )), 3, 4), sep = '')
     
+    # Get date of the forecasted y-o-y data point and create a label
     date_prev_yoy = nth(zoo::index(estimated$decomp2[, 1]),
                         ifelse(weekly,-53,-13))
     date_next_yoy = nth(zoo::index(estimated$decomp2[, 1]),
@@ -375,6 +433,8 @@ server <- function(input, output, session) {
     label_next_yoy <-
       paste(day(as.Date(date_next_yoy)), ' ', labelset[month(as.Date(date_next_yoy))], '-', substr(year(as.Date(date_next_yoy)), 3, 4), sep =
               '')
+    
+    # Stack 4 cards together
     Stack(
       div(model_name, style = 'margin-bottom:10px;', class = 'ms-fontSize-20 ms-fontWeight-regular'),
       Stack(
@@ -400,7 +460,7 @@ server <- function(input, output, session) {
           card_type = 'neutral',
           icon = 'fa-coins'
         ),
-        # w-o-w / m-o-m card
+        # m-o-m card
         makeCard(
           content = Text('Инфляция:', variant = 'mediumPlus'),
           content2 = Text('Прогноз:', variant = 'mediumPlus'),
@@ -467,9 +527,7 @@ server <- function(input, output, session) {
   })
   # Plot y-o-y inflation graph when on respective page
   output$price_yoy <- renderPlotly({
-    if (is_page('yoy')) {
       plotdecomp(model(), yoy = 1)
-    }
   })
   # Plot w-o-w / m-o-m inflation graph when on respective page
   output$price_mom <- renderPlotly({
@@ -487,6 +545,70 @@ server <- function(input, output, session) {
       try(plot_price_decomp(model()))
     }
   })
+  output$impacts <- renderTable({
+    estimated <- model()
+    shares <- as.data.frame(round(estimated$shares,2))
+    impacts <- as.data.frame(round(estimated$cump_impact,2))
+    final <- cbind(shares, impacts)
+    other <- last(final)
+    final <- final[-nrow(final),]
+    final <- final[order(final[,1], decreasing=TRUE),]
+    final <- rbind(final, other)
+    final <- cbind(rownames(final), final)
+    names(final) <- c('Фактор', 'Объясняющаяя способность', 'Накопленный вклад в цену')
+    final[,2] <- paste(final[,2], '%', sep='')
+    final[,3] <- paste(final[,3], ' руб.', sep='')
+    final
+    }, align='lcc')
+  # Generate y-o-y downloadable .xlsx
+  output$download_yearly <- downloadHandler(
+    filename = function() {
+      model_name = model()$model_name
+      paste(model_name, "_г_г.xlsx", sep="")
+    },
+    content = function(file) {
+      model_name = model()$model_name
+      estimated <- loadR(model_name)
+      data <- data.frame(estimated$decomp2)
+      data$date <- as.Date((rownames(data)))
+      data <- data[,c(ncol(data),(1:ncol(data)-1))]
+      names(data) <- c('Дата', 'Изменение цены г/г', 'Инфляция спроса', estimated$varlabels, 'Прочие факторы')
+      write_xlsx(data, file)
+    })
+  # Generate m-o-m downloadable .xlsx
+  output$download_monthly <- downloadHandler(
+    filename = function() {
+      model_name = model()$model_name
+      paste(model_name, "_м_м.xlsx", sep="")
+    },
+    content = function(file) {
+      model_name = model()$model_name
+      estimated <- loadR(model_name)
+      data <- data.frame(estimated$decomp)
+      data$date <- as.Date(rownames(data))
+      data <- data[,c(ncol(data),(1:ncol(data)-1))]
+      names(data) <- c('Дата', 'Изменение цены м/м', 'Инфляция спроса', estimated$varlabels, 'Сезонность', 'Прочие факторы')
+      write_xlsx(data, file)
+    })
+  # Generate price structure downloadable .xlsx
+  output$download_str <- downloadHandler(
+    filename = function() {
+      model_name = model()$model_name
+      estimated <- loadR(model_name)
+      paste(model_name, "_cтруктура.xlsx", sep="")
+    },
+    content = function(file) {
+      model_name = model()$model_name
+      estimated <- loadR(model_name)
+      data <- estimated$price_decomp
+      names <- colnames(data)
+      data <- data.frame(data)
+      data$price <- rowSums(data)
+      data$date <- as.Date(rownames(data))
+      data <- data[,c(ncol(data), (ncol(data)-1), 1:(ncol(data)-2))]
+      names(data) <- c('Дата', 'Цена', names)
+      write_xlsx(data, file)
+    })
 }
 # Start Shiny App
 shinyApp(ui, server)

@@ -3,7 +3,7 @@
     "path": "C:/Users/ilua/Dropbox/Ilya Gulenkov/Dashboard/infl_dashboard_app/app.R",
     "project_path": "app.R",
     "type": "r_source",
-    "hash": "0",
+    "hash": "1472702228",
     "contents": "",
     "dirty": false,
     "created": 1635869195350.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "2,100",
-        "scrollLine": "0"
+        "cursorPosition": "559,42",
+        "scrollLine": "543"
     },
     "folds": "",
-    "lastKnownWriteTime": 1635869880,
+    "lastKnownWriteTime": 1635900285,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1635869880935,
+    "last_content_update": 1635900285590,
     "read_only": false,
     "read_only_alternatives": []
 }
