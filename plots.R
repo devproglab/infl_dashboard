@@ -63,41 +63,31 @@ plotdecomp = function(model, yoy=1) {
     lower_lim <- min(rowSums(supplem, na.rm=TRUE))*1.2
     
     ncolors <- ncol(decomp2) - 1
-    # if (ncolors<=9) {
-    #   colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
-    # } else {
-    #   colors <- adjustcolor(brewer.pal(n = 12, name = 'Set3'), alpha.f=1)
-    # }
-    colors <- c('#6929c4',
-    '#1192e8',
-    '#005d5d',
-    '#9f1853',
-    '#fa4d56',
-    '#570408',
-    '#198038',
-    '#002d9c',
-    '#ee538b',
-    '#b28600',
-    '#009d9a',
-    '#012749')
-    # colors <- c('#4c8f56', '#76a164', '#9cb376', '#bfc58b', '#e0d8a5', '#ffecc1', '#fed4aa', '#fdba9a', '#f9a193', '#ef8894', '#de729c')
-    # colors <- c('#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5')
-    if (weekly) {
-      shade_start <- last(graph_material$date) + days(4)
+    if (ncolors<=9) {
+      colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
     } else {
-      shade_start <- last(graph_material$date) + weeks(2)
-    }   
-    if (weekly) {
-      shade_end <- last(forecast2$date) + days(4)
-    } else {
-      shade_end <- last(forecast2$date) + weeks(2)
+      colors <- adjustcolor(brewer.pal(n = 12, name = 'Set3'), alpha.f=1)
     }
-    p <- ggplot() +
-      annotate("rect", xmin = shade_start, xmax = shade_end, ymin = lower_lim, ymax = upper_lim, alpha = .5)
+    if (!n.ahead==0) {
+      if (weekly) {
+        shade_start <- last(graph_material$date) + days(4)
+      } else {
+        shade_start <- last(graph_material$date) + weeks(2)
+      }   
+      if (weekly) {
+        shade_end <- last(forecast2$date) + days(4)
+      } else {
+        shade_end <- last(forecast2$date) + weeks(2)
+      }
+      p <- ggplot() +
+        annotate("rect", xmin = shade_start, xmax = shade_end, ymin = lower_lim, ymax = upper_lim, alpha = .5)
+    }
     if (!n.ahead==0) {
       p <- p + 
         geom_ribbon(data = forecast2, aes(x = date, ymin = lower, ymax = upper), alpha=0.5, fill='#72bcd4') +
         geom_line(data = forecast2, aes(x = date,  y = value, text = paste('Прогноз, ', paste(day(as.Date(date)), labelset[month(as.Date(date))], year(as.Date(date)), sep=' '), ' г/г: ', round(value,2), '%<br>', 'Нижняя граница: ', round(lower, 2), '%<br>', 'Верхняя граница: ', round(upper, 2), '%', sep='')), size = ifelse(weekly, 0.7, 1), color = "blue", group = 1)
+    } else {
+      p <- ggplot()
     }
       p <- p + geom_line(data = graph_material, aes(x = date,  y = value, text = paste('Изменение цены, ', paste(day(as.Date(date)), labelset[month(as.Date(date))], year(as.Date(date)), sep=' '), ' г/г: ', round(value,2), '%', sep='')), size = ifelse(weekly, 0.7, 1), color = "black", group = 1) +
       geom_col(data = graph_material_long, position = "stack", show.legend = NA, 
@@ -163,23 +153,27 @@ plotdecomp = function(model, yoy=1) {
     } else {
       colors <- adjustcolor(brewer.pal(n = 12, name = 'Set3'), alpha.f=1)
     }
-    if (weekly) {
-      shade_start <- last(graph_material$date) + days(4)
-    } else {
-      shade_start <- last(graph_material$date) + weeks(2)
-    }    
-    if (weekly) {
-      shade_end <- last(forecast$date) + days(4)
-    } else {
-      shade_end <- last(forecast$date) + weeks(2)
+    if (!n.ahead==0) {
+      if (weekly) {
+        shade_start <- last(graph_material$date) + days(4)
+      } else {
+        shade_start <- last(graph_material$date) + weeks(2)
+      }    
+      if (weekly) {
+        shade_end <- last(forecast$date) + days(4)
+      } else {
+        shade_end <- last(forecast$date) + weeks(2)
+      }
+  
+        p <- ggplot() +
+          annotate("rect", xmin = shade_start, xmax = shade_end, ymin = lower_lim, ymax = upper_lim, alpha = .5)
     }
-
-      p <- ggplot() +
-        annotate("rect", xmin = shade_start, xmax = shade_end, ymin = lower_lim, ymax = upper_lim, alpha = .5)
       if (!n.ahead==0) {
           p <- p + geom_ribbon(data = forecast, aes(x = date, ymin = lower, ymax = upper), alpha=0.5, fill='#72bcd4') +
             geom_line(data = forecast, aes(x = date,  y = value, text = paste('Прогноз, ', paste(day(as.Date(date)), labelset[month(as.Date(date))], year(as.Date(date)), sep=' '), ' м/м: ', round(value,2), '%<br>', 'Нижняя граница: ', round(lower, 2), '%<br>', 'Верхняя граница: ', round(upper, 2), '%', sep='')), size = ifelse(weekly, 0.7, 1), color = "blue", group = 1)
-        }    
+      } else {
+          p <- ggplot()
+        }
       p <- p + geom_line(data = graph_material, aes(x = date,  y = value, text = paste('Изменение цены, ', paste(day(as.Date(date)), labelset[month(as.Date(date))], year(as.Date(date)), sep=' '), ' м/м: ', round(value,2), '%', sep='')), size = ifelse(weekly, 0.7, 1), color = "black", group = 1) +
         geom_col(data = graph_material_long, position = "stack", show.legend = NA, 
                  aes(x = date, y = value, fill = variable, width = ifelse(weekly, 7, 25), text = paste('Фактор: ', variable, '<br>Влияние, ', paste(day(as.Date(date)), labelset[month(as.Date(date))], year(as.Date(date)), sep=' '), ': ', round(value,2), '%', sep=''))) +
@@ -223,7 +217,6 @@ plotimpacts <- function(estimated) {
   fig <- plot_ly(
     type = 'table',
     header = list(
-      fill = list(color = 'rgb(0, 0, 0)'),
       values = c("<b>Фактор</b>", paste('<b>', names(final), '</b>', sep='')),
       align = c('center', rep('center', ncol(final)))
     ),
@@ -233,8 +226,7 @@ plotimpacts <- function(estimated) {
         t(paste(as.matrix(unname(final[,1])), '%', sep='')),
         t(paste(as.matrix(unname(final[,2])), ' руб.', sep=''))
       ),
-      align = c('left', rep('center', ncol(final))),
-      fill = list(color = 'black')
+      align = c('left', rep('center', ncol(final)))
     ))
   m <- list(
     l = 5,
@@ -243,8 +235,7 @@ plotimpacts <- function(estimated) {
     t = 20,
     pad = 5
   )
-  fig %>% config(displayModeBar = F) %>% layout(margin=m) %>% 
-    layout(plot_bgcolor  = "rgb(0,0,0)", paper_bgcolor = "rgb(0,0,0)") 
+  fig %>% config(displayModeBar = F) %>% layout(margin=m)
 }
 
 plot_price_decomp <- function(estimated) {

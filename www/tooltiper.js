@@ -59,4 +59,8 @@ function tips() {
     if ($('td:contains("Импортный табак"):last i').length == 0) {
     $('td:contains("Импортный табак"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip"><span class="tooltip-factor">Средняя стоимость импортируемого для переработки табачного сырья, ФТС</span></i>');
     }
+    if ($('td:contains("Объем импорта на рынке"):last i').length == 0) {
+    $('td:contains("Объем импорта на рынке"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip"><span class="tooltip-factor">Предложение импортного товара-субститута на рынке, ФТС</span></i>');
+    }
+    
 }

@@ -1,9 +1,0 @@
-library(shiny.fluent)
-library(shiny)
-
-if (interactive()) {
-  shinyApp(
-    ui = MessageBar("Message"),
-    server = function(input, output) {}
-  )
-}

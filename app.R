@@ -28,7 +28,7 @@ model_groups <- read_xlsx('data_output/models/model_groups.xlsx')
 models <- substr(model_groups$model, 1, nchar(model_groups$model)-6)
 groups_counter <- model_groups %>%
   group_by(group) %>%
-  summarize(n = n())
+  summarise(n = n())
 groups_counter <- groups_counter[match(unique(model_groups$group), groups_counter$group),]
 groups_counter$cumsum <- cumsum(groups_counter$n)
 groups_nav <- list()
@@ -36,7 +36,6 @@ for (i in 1:nrow(groups_counter)) {
   elem <- list(key = paste('g', i, sep=''), name = groups_counter$group[i], startIndex = groups_counter$cumsum[i] - groups_counter$n[i], count = groups_counter$n[i], isCollapsed = ifelse(i==1, FALSE, TRUE))
   groups_nav[[i]] <- elem
 }
-
 prods_list <- as.list(models)
 options <- list(list(key = models[1], text = models[1]))
 for (i in 2:length(models)) {
@@ -156,19 +155,25 @@ navigation <- tagList (
         name = 'Изменение цен - г/г',
         url = '#!/yoy',
         key = 'yoy',
-        icon = 'Home'
+        icon = 'CalculatorPercentage'
       ),
       list(
         name = 'Изменение цен - м/м',
         url = '#!/mom',
         key = 'mom',
-        icon = 'Home'
+        icon = 'CalculatorPercentage'
       ),
       list(
         name = 'Структура розничной цены',
         url = '#!/struct',
         key = 'struct',
-        icon = 'Home'
+        icon = 'AreaChart'
+      ),
+      list(
+        name = 'Анализ предложения на рынке',
+        url = '#!/market',
+        key = 'market',
+        icon = 'PieDouble'
       )
     ))),
     initialSelectedKey = 'home',
@@ -209,14 +214,14 @@ footer <- Stack(
   Stack(
     horizontal = TRUE,
     horizontalAlign = 'end',
-    Link(href = 'https://www.dropbox.com/s/d5epkzmzbjxwru1/comments.pdf?dl=0', target='_blank',
+    Link(href = 'https://disk.yandex.ru/i/-K1zML1CoFWjRA', target='_blank',
       Text(
       variant = "medium",
       nowrap = FALSE,
       "Методологическая справка",
       style = 'padding: 0px 14px 0px 14px'
     )),
-    Link(href = 'https://www.dropbox.com/s/l3ngc665paphegw/Dashboard_summary-aug2021%2B%D1%81%D0%BC.pdf?dl=0', target='_blank',
+    Link(href = 'https://disk.yandex.ru/i/uX5WL4YZDniOqQ', target='_blank',
       Text(
       variant = "medium",
       nowrap = FALSE,
@@ -279,6 +284,19 @@ struct_page <- makePage(
     style='height:600px;'
     )
 )
+# Market analysis page
+market_page <- makePage(
+  title = "Анализ предложения на рынке",
+  subtitle = "По данным Росстата и ФТС",
+  contents = div(
+    MessageBar("На данном графике представлена динамика средней цены выбранного товара в разбивке по основным статьям структуры розничной цены. 
+Эти статьи отражают вклад каждого из участников цепочки поставок в формирование конечной потребительской стоимости товара."
+               , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
+    # span(downloadLink("download_str", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
+    # shinycssloaders::withSpinner(plotlyOutput('price_structure'), type = 6),
+    style='height:600px;'
+  )
+)
 
 #---------------------------------------------------------------------------------------------------
 # Define unique URLs for pages & setup the UI
@@ -287,7 +305,8 @@ router <- make_router(
   route("/", home_page),
   route("yoy", yoy_page),
   route('mom', mom_page),
-  route('struct', struct_page)
+  route('struct', struct_page),
+  route('market', market_page)
 )
 ui <- fluentPage(
   lay(router$ui),
@@ -390,11 +409,19 @@ server <- function(input, output, session) {
     # Sum up 4 latest data points for a weekly model + get forecast
       length <- nrow(estimated$dfmod_unsmoothed)
       period_change = sum(estimated$dfmod_unsmoothed[(length - n.ahead + 1 - 4):(length - n.ahead), 1])
-      forecast_period = xts(t(colSums(round(estimated$forecast[2:5] * 100, 2))), order.by=zoo::index(estimated$forecast[5]))
+      if (!n.ahead==0) {
+        forecast_period = xts(t(colSums(round(estimated$forecast[2:5] * 100, 2))), order.by=zoo::index(estimated$forecast[5]))
+      } else {
+        forecast_period=NULL
+      }
     } else {
     # Get the latest data point for a monthly model 
       period_change = nth(estimated$dfmod_unsmoothed[, 1],-(n.ahead + 1))
-      forecast_period = round(estimated$forecast[2] * 100, 2)
+      if (!n.ahead==0) {
+        forecast_period = round(estimated$forecast[2] * 100, 2)
+      } else {
+        forecast_period=NULL
+      }
     }
     
     # Get y-o-y change and define ruble symbol
