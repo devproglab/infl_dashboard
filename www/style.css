@@ -235,11 +235,11 @@ body {
 		display: block
 }
 @font-face {
-            font-family: 'FabricMDL2Icons';
-            src: url('https://appsforoffice.microsoft.com/fabric/fonts/icons/FabricMDL2Icons.woff') format('woff'), url('https://appsforoffice.microsoft.com/fabric/fonts/icons/FabricMDL2Icons.ttf') format('truetype');
+            font-family: FabricMDL2Icons;
+            src: url('FabricMDL2Icons.woff') format('woff');
             font-weight: normal;
             font-style: normal;
         }
 .tooltip-factor {
-  font-family: 'FabricMDL2Icons';
+  font-family: FabricMDL2Icons;
 }

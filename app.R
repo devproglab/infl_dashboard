@@ -314,6 +314,7 @@ ui <- fluentPage(
   tags$head(
     htmlOutput('toggler'),
     tags$script(src='tooltiper.js', type="text/javascript"),
+    # tags$link(href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/7.2.0/css/fabric.min.css"),
     tags$link(href = "style.css", rel = "stylesheet", type = "text/css"),
     tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css"),
     shiny_router_script_tag
