@@ -236,6 +236,10 @@ body {
 }
 .tooltip-factor {
   font-family: FabricMDL2Icons;
-  src: url('https://appsforoffice.microsoft.com/fabric/fonts/icons/FabricMDL2Icons.woff') format('woff'), url('https://appsforoffice.microsoft.com/fabric/fonts/icons/FabricMDL2Icons.ttf') format('truetype');
-
 }
+@font-face {
+            font-family: 'FabricMDL2Icons';
+            src: url('https://appsforoffice.microsoft.com/fabric/fonts/icons/FabricMDL2Icons.woff') format('woff'), url('https://appsforoffice.microsoft.com/fabric/fonts/icons/FabricMDL2Icons.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
