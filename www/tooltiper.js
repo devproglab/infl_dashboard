@@ -1,6 +1,6 @@
 function tips() {
     if ($('td:contains("Сырое молоко"):last i').length == 0) {
-      $('td:contains("Сырое молоко"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip ms-Icon root-32 css-71"><span class="tooltip-factor">Отпускные цены сельхозпроизводителей молока, Росстат</span></i>');
+      $('td:contains("Сырое молоко"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip ms-Icon root-32 css-71" style="position:relative!important"><span class="tooltip-factor">Отпускные цены сельхозпроизводителей молока, Росстат</span></i>');
     }
     if ($('td:contains("Производственные издержки"):last i').length == 0) {
     $('td:contains("Производственные издержки"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip ms-Icon root-32 css-71"><span class="tooltip-factor">Средние цены производителей в отрасли, Росстат</span></i>');
@@ -62,5 +62,12 @@ function tips() {
     if ($('td:contains("Объем импорта на рынке"):last i').length == 0) {
     $('td:contains("Объем импорта на рынке"):last').append('<i data-icon-name="Info" aria-hidden="true" class="icon-128 icon-tooltip ms-Icon root-32 css-71"><span class="tooltip-factor">Предложение импортного товара-субститута на рынке, ФТС</span></i>');
     }
-    
 }
+
+$('.chosen_model').removeClass('chosen_model');
+function highlight2() {
+      if ($('.chosen_market').length == 0) {
+        $('[label="Сигареты и папиросы"]').addClass('chosen_market')
+      }
+    }
+$('.chosen_market').removeClass('chosen_market');

@@ -23,6 +23,7 @@ labelset[5] <- 'май'
 # hse_green = palette[3]
 # hse_red   =  palette[1]
 # hse_blue  = palette[2]
+
 # Prepare list of models
 model_groups <- read_xlsx('data_output/models/model_groups.xlsx')
 models <- substr(model_groups$model, 1, nchar(model_groups$model)-6)
@@ -42,6 +43,29 @@ for (i in 2:length(models)) {
   elem <- list(key = models[i], text = models[i])
   options[[i]] <- elem
 }
+
+# Prepare list of supply markets for analysis
+market_groups <- read_xlsx('data_output/supply_analysis/market_groups.xlsx')
+markets <- substr(market_groups$model, 1, nchar(market_groups$model)-6)
+groups_counter <- market_groups %>%
+  group_by(group) %>%
+  summarise(n = n())
+groups_counter <- groups_counter[match(unique(market_groups$group), groups_counter$group),]
+groups_counter$cumsum <- cumsum(groups_counter$n)
+groups_nav_supply <- list()
+for (i in 1:nrow(groups_counter)) {
+  elem <- list(key = paste('g', i, sep=''), name = groups_counter$group[i], startIndex = groups_counter$cumsum[i] - groups_counter$n[i], count = groups_counter$n[i], isCollapsed = ifelse(i==1, FALSE, TRUE))
+  groups_nav_supply[[i]] <- elem
+}
+prods_list_supply <- as.list(markets)
+options <- list(list(key = markets[1], text = markets[1]))
+for (i in 2:length(markets)) {
+  elem <- list(key = markets[i], text = markets[i])
+  options[[i]] <- elem
+}
+
+
+rus_map <- readRDS('data_output/federal_districts.rds')
 
 #---------------------------------------------------------------------------------------------------
 # Define helper functions
@@ -115,7 +139,6 @@ lay <- function(mainUI) {
     class = "grid-container",
     div(class = "header", header),
     div(class = "sidenav", navigation),
-    div(class = "cards", cards),
     div(class = "main", mainUI, style='overflow:hidden!important;'),
     div(class = "footer", footer)
   )
@@ -129,17 +152,7 @@ header <- tagList(
   div(class = 'logo-block',
   Link(href = '/', img(src = "hse-logo.png", class = "logo")),
   div(Link(href = '/', Text(variant = "xLarge", "Анализ потребительских цен"), class = 'title-link'), class = "title")
-  ),
-  span(
-    TooltipHost(
-      content = "Загрузка данных отображаемого графика в формате .xlsx",
-      delay = 0,
-    CommandBar(
-    items = list(
-        CommandBarItem("Скачать", "Download", id="download")
-    ),
-    style = list(width = "100%")
-  )), style = "margin-left: auto")
+  )
 )
 # Sidebar navigation & product choice
 navigation <- tagList (
@@ -152,22 +165,16 @@ navigation <- tagList (
         icon = 'Home'
       ),
       list(
-        name = 'Изменение цен - г/г',
-        url = '#!/yoy',
-        key = 'yoy',
+        name = 'Потребительские цены',
+        url = '#!/cons',
+        key = 'cons',
         icon = 'CalculatorPercentage'
       ),
       list(
-        name = 'Изменение цен - м/м',
-        url = '#!/mom',
-        key = 'mom',
+        name = 'Цены производителей, импорта и экспорта',
+        url = '#!/prod',
+        key = 'prod',
         icon = 'CalculatorPercentage'
-      ),
-      list(
-        name = 'Структура розничной цены',
-        url = '#!/struct',
-        key = 'struct',
-        icon = 'AreaChart'
       ),
       list(
         name = 'Анализ предложения на рынке',
@@ -186,19 +193,7 @@ navigation <- tagList (
     )
   ),
   Text('Анализируемые товары:', variant='large'),
-  GroupedList(
-    items = prods_list,
-    groups = groups_nav,
-    selectionMode = 0,
-    onShouldVirtualize = FALSE,
-    onRenderCell = JS("(depth, item) => (
-        jsmodule['react'].createElement('div', { className : 'model_choice', style: { paddingLeft: 20 }, label: item, onClick : () => {Shiny.setInputValue('prod_select', item) } }, item)
-      )")
-  ),
-  div(
-    textInput('prod_select', label = NULL, value = models[1], ),
-    style = 'display:none'
-  )
+  htmlOutput('sidebar_choice')
 )
 
 # Footer with credits and links
@@ -227,7 +222,8 @@ footer <- Stack(
       nowrap = FALSE,
       "Презентация",
       style = "border-left: 1px solid darkgray; padding: 0px 14px 0px 14px"
-    ))
+    )),
+    reactOutput("reactPanel")
   )
 )
 # Load value boxes
@@ -236,89 +232,197 @@ cards <- htmlOutput('card_set')
 home_page <- makePage(title = 'Факторный анализ потребительских цен',
                       subtitle = "Общие сведения",
                       contents = htmlOutput('main_loader'))
-# Y-o-y inflation page
-yoy_page <- makePage(
-  title = "Изменение цен",
-  subtitle = "К аналогичному периоду предыдущего года",
-  contents = div(
-    MessageBar("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
+# constuct tabs for Consumer Prices page
+pivot_consumer <- Pivot(
+  PivotItem(headerText = "Изменение цен - г/г", 
+            tags$br(),
+            tags$span(
+            tags$table(tags$tr(
+              tags$td("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
 Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
-                    , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
-    span(downloadLink("download_yearly", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
-    tags$table( width='100%',
-      tags$thead(
-        tags$th('Динамика цен', width='60%'),
-        tags$th('Результаты моделирования, с 2015 года', width='40%')
-      ),
-      tags$tr(
-      tags$td(shinycssloaders::withSpinner(plotlyOutput('price_yoy'), type=6)),
-      tags$td(shinycssloaders::withSpinner(tableOutput('impacts'), type=6), valign='top')
-      )
-    ),
+                      , width='80%'),
+              tags$td(span(CommandBar(
+                  items = list(
+                    CommandBarItem("Скачать", "Download", id="download_yearly", onClick=JS("function() { window.location.href = $('#download_yearly_shadow').attr('href'); }")),
+                    CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
+                  )
+                ),style="display:block;"), width='20%', align='right')
+            )),
+            class="ms-depth-8 text-card"),
+            tags$table( width='100%',
+                        tags$tr(
+                          tags$td('Динамика цен', width='60%'),
+                          tags$td('Результаты моделирования, с 2015 года', width='40%'),
+                          style="font-weight: bold; text-align:center;"
+                        ),
+                        tags$tr(
+                          tags$td(
+                            plotlyOutput('price_yoy')),
+                          tags$td(tableOutput('impacts'), valign='top')
+                        )
+            )),
+  PivotItem(headerText = "Изменение цен - м/м", 
+            tags$br(),
+            tags$span(
+              tags$table(tags$tr(
+                tags$td("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
+Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
+                        , width='80%'),
+                tags$td(span(CommandBar(
+                  items = list(
+                    CommandBarItem("Скачать", "Download", id="download_monthly", onClick=JS("function() { window.location.href = $('#download_mom_shadow').attr('href'); }")),
+                    CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
+                  )
+                ), style="display:block;"), width='20%', align='right')
+              )),
+              class="ms-depth-8 text-card"),
+            tags$table(width='100%', 
+                       tags$thead(
+                         tags$th('Динамика цен', width='60%'),
+                         tags$th('Пояснения', width='40%')
+                       ),
+                       tags$tr(tags$td(plotlyOutput('price_mom')))
+                       )),
+  PivotItem(headerText = "Структура розничной цены", 
+            tags$br(),
+            tags$span(
+              tags$table(tags$tr(
+                tags$td("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
+Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
+                        , width='80%'),
+                tags$td(span(CommandBar(
+                  items = list(
+                    CommandBarItem("Скачать", "Download", id="download_struct", onClick=JS("function() { window.location.href = $('#download_str_shadow').attr('href'); }"))                  )
+                ), style="display:block;"), width='20%', align='right')
+              )),
+              class="ms-depth-8 text-card"),
+            tags$table(width='100%', 
+                       tags$thead(
+                         tags$th('Динамика цен', width='60%'),
+                         tags$th('Пояснения', width='40%')
+                       ),
+                       tags$tr(
+              tags$td(plotlyOutput('price_structure'))
+            )
+            ))
+)
+# Consumer prices page
+cons_page <- makePage(
+  title = "Динамика потребительских цен",
+  subtitle = "",
+  contents = div(
+    div(class = "cards", cards),
+    span(downloadLink("download_yearly_shadow", "Скачать данные в .xlsx"),
+         downloadLink("download_mom_shadow", "Скачать данные в .xlsx"),
+         downloadLink("download_str_shadow", "Скачать данные в .xlsx"),
+         style='visibility:hidden; overflow:hidden;'),
+    pivot_consumer,
     style='height:600px;'
   )
 )
-# Period-over-period (w-o-w / m-o-m) inflation page
-mom_page <- makePage(
-  title = "Изменение цен",
-  subtitle = "К предыдущему периоду",
+# Producer, import & export prices page
+prod_page <- makePage(
+  title = "Динамика цен производителей, импорта и экспорта",
+  subtitle = ".....",
   contents = div(
-    MessageBar("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с предыдущим периодом - неделей или месяцем. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка, включая сезонность. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
-Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
-               , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
-    span(downloadLink("download_monthly", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
-    shinycssloaders::withSpinner(plotlyOutput('price_mom'), type =6),
+
     style='height:600px;'
-    )
+  )
 )
-# Price structure page
-struct_page <- makePage(
-  title = "Структура потребительской цены",
-  subtitle = "По данным Росстата",
-  contents = div(
-    MessageBar("На данном графике представлена динамика средней цены выбранного товара в разбивке по основным статьям структуры розничной цены. 
-Эти статьи отражают вклад каждого из участников цепочки поставок в формирование конечной потребительской стоимости товара."
-               , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
-    span(downloadLink("download_str", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
-    shinycssloaders::withSpinner(plotlyOutput('price_structure'), type = 6),
-    style='height:600px;'
-    )
-)
+
 # Market analysis page
+datepicker <- airMonthpickerInput(inputId = "date_map",
+                                  inline = TRUE,
+                                  language = 'ru',
+                                  value = as.Date('2022-02-01'),
+                                  minDate = as.Date('2011-01-01'),
+                                  maxDate = as.Date('2022-02-01'))
+pivot_graphs <- tags$table(width='100%', tags$tr(
+  tags$td(
+    shinycssloaders::withSpinner(plotlyOutput('supply_analysis'), type=6),
+    width="100%", colspan=2)
+),
+tags$tr(tags$td(
+  h4('На графике ниже представлена географическая структура производства товара')
+)),
+tags$tr(
+  tags$td(
+    # shinycssloaders::withSpinner(plotlyOutput('supply_map'), type=6)
+    plotlyOutput('map_sa')
+  )
+)
+)
 market_page <- makePage(
   title = "Анализ предложения на рынке",
   subtitle = "По данным Росстата и ФТС",
   contents = div(
-    MessageBar("На данном графике представлена динамика средней цены выбранного товара в разбивке по основным статьям структуры розничной цены. 
-Эти статьи отражают вклад каждого из участников цепочки поставок в формирование конечной потребительской стоимости товара."
-               , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
+    tags$br(),
+    tags$div(
+      tags$div("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
+Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта.",
+               style="flex-basis: 70%;"),
+      tags$div(
+        tags$div(Toggle.shinyInput("sa_toggle",value = TRUE,
+                                   label = "",
+                                   onText = "Сезонное сглаживание включено",
+                                   offText = "Сезонное сглаживание отключено"
+        )),
+        tags$div(CommandBar(
+          items = list(
+            CommandBarItem("Скачать", "Download", id="download_yearly", onClick=JS("function() { window.location.href = $('#download_yearly_shadow').attr('href'); }"))
+          ))),
+        style='display:flex; flex-wrap:nowrap; flex-direction:column;justify-content: space-around;align-items:center;'),
+      style="display:flex; flex-wrap:nowrap;justify-content: space-around;", class="text-card ms-depth-8"),
+#     
+#     tags$span(
+#       tags$table(tags$tr(
+#         tags$td("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
+# Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
+#                 , width='80%'),
+#         
+#         tags$td(,span(
+#           
+#           
+#         ),style="display:block;"), width='20%', align='center')
+#       )),
+#       class="ms-depth-8 text-card"),
+    # MessageBar("В данном разделе представлен анализ совокупного предложения рассматриваемого товара на рынке. Ресурсы, доступные для потребления,
+    #            рассчитываются как сумма внутреннего производства и импортных поставок за вычетом экспорта и изменения запасов."
+    #            , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
     # span(downloadLink("download_str", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
-    # shinycssloaders::withSpinner(plotlyOutput('price_structure'), type = 6),
-    style='height:600px;'
+    # shinycssloaders::withSpinner(plotlyOutput('supply_analysis'), type = 6),
+    tags$table(width="100%",
+               
+               
+               tags$tr(
+                 tags$td(pivot_graphs, width="80%"),
+                 tags$td(datepicker, width="20%", valign='bottom', align='center', style='padding-bottom:10%;')
+               )),
+    style='height:1300px;')
   )
-)
+
+
 
 #---------------------------------------------------------------------------------------------------
 # Define unique URLs for pages & setup the UI
 #---------------------------------------------------------------------------------------------------
 router <- make_router(
   route("/", home_page),
-  route("yoy", yoy_page),
-  route('mom', mom_page),
-  route('struct', struct_page),
+  route("cons", cons_page),
+  route("prod", prod_page),
   route('market', market_page)
 )
 ui <- fluentPage(
   lay(router$ui),
   useShinyjs(),
   tags$head(
-    htmlOutput('toggler'),
     tags$script(src='tooltiper.js', type="text/javascript"),
     # tags$link(href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/7.2.0/css/fabric.min.css"),
     tags$link(href = "style.css", rel = "stylesheet", type = "text/css"),
     tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css"),
-    shiny_router_script_tag
-  )
+    shiny_router_script_tag,
+  ),
+  htmlOutput('toggler')
 )
 
 #---------------------------------------------------------------------------------------------------
@@ -327,68 +431,105 @@ ui <- fluentPage(
 server <- function(input, output, session) {
   router$server(input, output, session)
   # JS workarounds
+  output$sidebar_choice <- renderUI({
+      tags$span(
+        tags$span(
+        GroupedList(
+        items = prods_list,
+        groups = groups_nav,
+        selectionMode = 0,
+        onShouldVirtualize = FALSE,
+        onRenderCell = JS("(depth, item) => (
+        jsmodule['react'].createElement('div', { className : 'model_choice', style: { paddingLeft: 20 }, label: item, onClick : () => {Shiny.setInputValue('prod_select', item) } }, item)
+      )")),
+      div(
+        textInput('prod_select', label = NULL, value = models[1]),
+        style = 'display:none'
+      ), id='choice_models', style='display:block;'
+    ),
+      tags$span(GroupedList(
+        items = prods_list_supply,
+        groups = groups_nav_supply,
+        selectionMode = 0,
+        onShouldVirtualize = FALSE,
+        onRenderCell = JS("(depth, item) => (
+        jsmodule['react'].createElement('div', { className : 'market_choice', style: { paddingLeft: 20 }, label: item, onClick : () => {Shiny.setInputValue('market_select', item) } }, item)
+      )")
+      ),
+      div(
+        textInput('market_select', label = NULL, value = markets[1]),
+        style = 'display:none'  
+      ), id='choice_markets', style='display:none'
+      )
+    )
+  })
   output$toggler <- renderUI({
     if (is_page('/')) {
-      # Disabling value boxes on the main page
-      shinyjs::runjs("$('.cards').css('visibility', 'hidden').css('overflow', 'hidden');") 
+      shinyjs::runjs(HTML("
+      $('#choice_markets').css('display', 'none');
+      $('#choice_models').css('display', 'block');
+                          "))
       # Disabling download button
-      shinyjs::runjs("$('#download').css('display', 'none')") 
+      # shinyjs::runjs("$('#download').css('display', 'none')") 
       # Highlighting the page in the menu
       script <- ''
-      for (i in c('yoy', 'mom', 'struct')) {
+      for (i in c('cons', 'prod', 'market')) {
         script <- paste(script, 
                         paste("$('[href=", '"', "#!/", i, '"', "]').addClass('unchosen_page'); ", sep = ""), sep="")
       }
       shinyjs::runjs(script) 
-      shinyjs::runjs(paste("$('[href=", '"', "#!/", '"', "]').removeClass('unchosen_page').addClass('chosen_page')", sep = "")) 
+      shinyjs::runjs(paste("$('[href=", '"', "#!/", '"', "]').removeClass('unchosen_page').addClass('chosen_page')", sep = ""))
     } else {
-      # Enabling value boxes on other pages
-      shinyjs::runjs("$('.cards').css('visibility', 'visible').css('overflow', 'visible');") 
       # Enabling download button
-      shinyjs::runjs("$('#download').css('display', 'block')") 
+      # shinyjs::runjs("$('#download').css('display', 'block')") 
       # Highlighting pages in the menu
-      if (is_page('yoy')) {
+      if (is_page('cons')) {
+        shinyjs::runjs(HTML("
+      $('#choice_markets').css('display', 'none');
+      $('#choice_models').css('display', 'block');
+                          "))
         script <- ''
-        for (i in c('', 'mom', 'struct')) {
+        for (i in c('', 'prod', 'market')) {
           script <- paste(script, 
                       paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
         shinyjs::runjs(script) 
-        shinyjs::runjs(paste("$('[href=", '"', "#!/yoy", '"', "]').addClass('chosen_page')", sep = "")) 
-        shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_yearly').attr('href');});") 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/cons", '"', "]').addClass('chosen_page')", sep = "")) 
+        # shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_yearly_shadow').attr('href');});") 
 
       }
-      if (is_page('mom')) {
+      if (is_page('prod')) {
+        shinyjs::runjs(HTML("
+      $('#choice_markets').css('display', 'block');
+      $('#choice_models').css('display', 'none');
+                          "))
         script <- ''
-        for (i in c('', 'yoy', 'struct')) {
+        for (i in c('', 'cons', 'market')) {
           script <- paste(script, 
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
         shinyjs::runjs(script) 
-        shinyjs::runjs(paste("$('[href=", '"', "#!/mom", '"', "]').addClass('chosen_page')", sep = "")) 
-        shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_monthly').attr('href');});")
+        shinyjs::runjs(paste("$('[href=", '"', "#!/prod", '"', "]').addClass('chosen_page')", sep = "")) 
+        # shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_yearly').attr('href');});") 
+        
       }
-      if (is_page('struct')) {
+      if (is_page('market')) {
+        shinyjs::runjs(HTML("
+      $('#choice_models').css('display', 'none');
+      $('#choice_markets').css('display', 'block');
+                          "))
         script <- ''
-        for (i in c('', 'mom', 'yoy')) {
+        for (i in c('', 'prod', 'cons')) {
           script <- paste(script, 
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
         shinyjs::runjs(script) 
-        shinyjs::runjs(paste("$('[href=", '"', "#!/struct", '"', "]').addClass('chosen_page')", sep = "")) 
-        shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_str').attr('href');});") 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/market", '"', "]').addClass('chosen_page')", sep = "")) 
+        # shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_str').attr('href');});") 
       }
     }
-    # Function to highlight the chosen model in the menu
-    tags$script(HTML(
-      paste("function highlight() {if ($('.chosen_model').length == 0) { $('[label=", '"', 
-            model()$model_name, '"', "]').addClass('chosen_model')}
-      } $('.chosen_model').removeClass('chosen_model');", 
-            sep = "")
-    ))
   })
-  # Ensure the chosen model is constantly highlighted
-  shinyjs::runjs('setInterval( function(){highlight(); tips()}, 1)') 
+
   # Load the model for a product
   model <- reactive({
     req(input$prod_select)
@@ -396,6 +537,42 @@ server <- function(input, output, session) {
     model <- loadR(model_name)
     return(model)
   })
+  market <- reactive({
+    req(input$market_select)
+    market_name = input$market_select
+    print(market_name)
+    market <- loadR(market_name, where='data_output/supply_analysis/')
+    market
+    return(market)
+  })
+  observeEvent(input$market_select, {
+    innerhtml <- paste("if ($('.chosen_market').length == 0) {
+        $('[label=", '"', req(market()$category), '"', "]').addClass('chosen_market')
+      }", sep = "")
+    shinyjs::runjs(HTML(paste('$(".chosen_market").removeClass("chosen_market");
+                              window.highlight = function() {', innerhtml, '}', sep='')))
+  })
+  observeEvent(input$prod_select, {
+    innerhtml <- paste("if ($('.chosen_model').length == 0) {
+        $('[label=", '"', req(model()$model_name), '"', "]').addClass('chosen_model')
+      }", sep = "")
+    shinyjs::runjs(HTML(paste('$(".chosen_model").removeClass("chosen_model");
+                              window.highlight = function() {', innerhtml, '}', sep='')))
+  })
+  # Ensure the chosen model is constantly highlighted
+  shinyjs::runjs('setInterval( function(){ highlight(); highlight2(); tips()}, 1)') 
+  # Create information panels
+  isPanelOpen <- reactiveVal(FALSE)
+  output$reactPanel <- renderReact({
+    Panel(
+      headerText = "Справка",
+      isOpen = isPanelOpen(),
+      model()$model_name,
+      onDismiss = JS("function() { Shiny.setInputValue('hidePanel', Math.random()); }")
+    )
+  })
+  observeEvent(input$showPanel, isPanelOpen(TRUE))
+  observeEvent(input$hidePanel, isPanelOpen(FALSE))
   # Create value boxes
   output$card_set <- renderUI({
     # Load model data
@@ -574,19 +751,39 @@ server <- function(input, output, session) {
   })
   # Plot w-o-w / m-o-m inflation graph when on respective page
   output$price_mom <- renderPlotly({
-    if (is_page('mom')) {
       plotdecomp(model(), yoy = 0)
-    }
   })
   # Plot price structure graph when on respective page if data exists
   output$price_structure <- renderPlotly({
-    if (is_page('struct')) {
       validate(need(
         !is.null(model()$price_decomp),
         "Данные по структуре розничной цены данного товара недоступны"
       ))
       try(plot_price_decomp(model()))
-    }
+  })
+  # Plot supply structure on respective page
+  output$supply_analysis <- renderPlotly({
+    stack_supply(market(), sa = input$sa_toggle)
+  })
+  output$supply_analysis_non_sa <- renderPlotly({
+    stack_supply(market(), sa = FALSE)
+  }) 
+  # observe({
+  #   data_map <- market()$df_FD
+  #   data_map$date
+  #   dates_map <- unique(data_map$date)
+  #   dates_map
+  #   pars <- paste("minDate = '", first(dates_map), "', maxDate = '", last(dates_map), "'", sep='')
+  #   # updateAirDateInput(session, "date_map", value = last(dates_map), options=pars)
+  # })
+  output$map_sa <- renderPlotly({
+    plot_map(market(), level='reg', sa=input$sa_toggle, date_choice=req(input$date_map))
+  })
+  output$supply_map <- renderPlotly({
+    production_map(market(), rus_map, sa=input$sa_toggle, date_choice=req(input$date_map))
+  })
+  output$supply_map_non_sa <- renderPlotly({
+    production_map(market(), rus_map, date_choice=req(input$date_map), sa=FALSE)
   })
   output$impacts <- renderTable({
     estimated <- model()
@@ -604,7 +801,7 @@ server <- function(input, output, session) {
     final
     }, align='lcc')
   # Generate y-o-y downloadable .xlsx
-  output$download_yearly <- downloadHandler(
+  output$download_yearly_shadow <- downloadHandler(
     filename = function() {
       model_name = model()$model_name
       paste(model_name, "_г_г.xlsx", sep="")
@@ -619,7 +816,7 @@ server <- function(input, output, session) {
       write_xlsx(data, file)
     })
   # Generate m-o-m downloadable .xlsx
-  output$download_monthly <- downloadHandler(
+  output$download_mom_shadow <- downloadHandler(
     filename = function() {
       model_name = model()$model_name
       paste(model_name, "_м_м.xlsx", sep="")
@@ -634,7 +831,7 @@ server <- function(input, output, session) {
       write_xlsx(data, file)
     })
   # Generate price structure downloadable .xlsx
-  output$download_str <- downloadHandler(
+  output$download_str_shadow <- downloadHandler(
     filename = function() {
       model_name = model()$model_name
       estimated <- loadR(model_name)

@@ -64,8 +64,6 @@ body {
   grid-area: cards;
   margin-top: 20px;
   background-color: #faf9f8;
-  padding-left: 40px;
-  padding-right: 32px;
 }
 
 .footer {
@@ -140,10 +138,22 @@ body {
   cursor: pointer;
   padding:7px;
 }
+.market_choice:hover {
+  background: rgb(243, 242, 241);
+  color: rgb(32, 31, 30);
+}
+.market_choice {
+  cursor: pointer;
+  padding:7px;
+}
 .root-101 .ms-List-cell {
   min-height: 0px!important;
 }
 .chosen_model {
+  background: rgb(243, 242, 241);
+  color: rgb(32, 31, 30);
+}
+.chosen_market {
   background: rgb(243, 242, 241);
   color: rgb(32, 31, 30);
 }
@@ -191,6 +201,8 @@ body {
   font-family: "Segoe UI", "Segoe UI Web (West European)", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif!important;
 	padding: 10px;
 	position: absolute;
+	top:0;
+	left:0;
 	width: auto;
 	white-space: nowrap;
 	word-wrap: no-wrap;
@@ -202,7 +214,6 @@ body {
 	z-index: 200;
 	font-size: 0.9em;
 	display: none
-  
 }
 .tooltip-factor:after {
 		content: '';
@@ -242,4 +253,31 @@ body {
         }
 .tooltip-factor {
   font-family: FabricMDL2Icons;
+}
+.airdatepicker {
+  border: 0!important;
+  background: 0;
+}
+.airdatepicker--cell.-selected- {
+  background: rgb(0, 120, 212)!important;
+}
+.root-56  {
+  background-color: transparent!important;
+}
+.root-63  {
+  background-color: transparent!important;
+}
+.root-63:hover  {
+  background-color: rgba(225, 223, 221, 0.2)!important;
+}
+.text-card {
+  display:block;
+  background: #fff;
+    padding: 28px;
+    margin-bottom: 28px;
+    border-radius: 2px;
+    background-clip: padding-box;
+}
+.primarySet-60 {
+    justify-content: flex-end!important;
 }

@@ -13,7 +13,7 @@ using <- function(...) {
 using("data.table", "readxl", "dplyr", "xts", "plotly", "stats", "writexl",
       "lubridate", "ggplot2", "shiny", "scales", "flexdashboard", "RColorBrewer", "clock",
       "downloadthis", "glue", "leaflet", "sass", "shiny", "shiny.fluent", "shiny.router",
-      "shinycssloaders", "shinyjs")
+      "shinycssloaders", "shinyjs", "stringr", "tmap", "sf", 'shinyWidgets', "geofacet", "purrr")
 
 theme_set(theme_minimal())
 options(scipen=999)
@@ -334,10 +334,188 @@ plotinputs = function(model) {
     print(p)
   }
 }
-loadR <- function(fileName){
-  #loads an RData file, and returns it
-  fileName <- paste('data_output/models/', fileName, '.RData', sep='')
-  load(fileName)
-  get(ls()[ls() != "fileName"])
+# loadR() load an estimated model into a separate variable ---------------------
+loadR <- function(fileName, where='./data_output/models/'){
+  fileName2 <- paste(where, fileName, '.RData', sep='')
+  load(fileName2)
+  get(ls()[which(ls() == fileName)])
 }
-
+#' Interactive bar chart of supply sources
+#'
+#' @param data A list returned by prepare_data()
+#'
+#' @return Produces an interactive graph showing the dynamics of total supply on the market  
+#' @export
+stack_supply <- function(data, sa = TRUE, save=FALSE) {
+  df <- data$df
+  df_sa <- data$df_sa
+  ed <- data$ed
+  colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
+  # colors <- brewer.pal(n = 9, name = 'Set3')
+  if (sa) {
+    p <- ggplot(df_sa)
+  } else {
+    p <- ggplot(df)
+  }
+  p <- p +
+    geom_bar(aes(fill=type, y=value, x=date, text=paste(type, ', ', format(date, format='%b %y'), ': ', round(value,2), ' ', ed, sep='')), stat="identity") +
+    geom_line(aes(y=total, x=date, color=ifelse(sa, 'Итого, сез. сглаж.', 'Итого'), 
+                  text=paste(ifelse(sa, 'Совокупное предложение (сез. сглаж.), ', 'Совокупное предложение, '), format(date, '%b %y'), ': ', round(total, 2), ' ', ed, sep=''),
+                  group=1),
+              size=1.2) +
+    xlab('') +
+    ylab(ed) +
+    scale_fill_manual(values = colors, name='') +
+    scale_x_date(breaks='6 months', labels = scales::label_date("%b-%y"), expand=expansion(add = 10))
+  if (sa) {
+    p <- p + scale_color_manual(values = c('Итого, сез. сглаж.' = "#008272"), name='')
+  } else {
+    p <- p + scale_color_manual(values = c("Итого" = "#008272"), name='')
+  }
+  p
+  if (save) {
+    ggsave(paste('fig/', str_replace_all(data$category, ' ', '_'), ifelse(sa, '_sa', ''), '_stack.jpg', sep=''), scale=3)
+  }
+  t <- ggplotly(p, tooltip='text') %>% config(displayModeBar = F) %>%
+    # layout(legend = list(orientation = "h", x = 0, y = -0.1)) %>%
+    layout(plot_bgcolor  = "rgba(0, 0, 0, 0)",
+           paper_bgcolor = "rgba(0, 0, 0, 0)") %>%
+    config(locale = 'ru')
+  for (i in 1:length(t$x$data)) {
+    t$x$data[[i]]$name <- str_sub(str_replace_all(t$x$data[[i]]$name, regex('[//(//)0-9]*'), ''), 1, -2)
+    if (!i>=5) {
+      t$x$data[[i]]$legendgroup <- 'bars'
+    } else {
+      t$x$data[[i]]$legendgroup <- 'line'
+    }
+  }
+  t
+}
+#' Interactive map displaying production across Federal Districts of Russia
+#'
+#' @param data A list returned by prepare_data()
+#'
+#' @return Produces an interactive graph showing the dynamics of total supply on the market  
+#' @export
+production_map <- function(data, rus_map, date_choice, sa = TRUE) {
+  if (sa) {
+    df <- data$df_FD_sa 
+  } else{
+    df <- data$df_FD
+  }
+  ed <- data$ed
+  names(df)[2] <- 'name'
+  # choice_date <- floor_date(as.Date(), unit='month')
+  limits <- c(min(df$value, na.rm=TRUE), max(df$value, na.rm=TRUE))
+  
+  data_date <- df %>%
+    filter(date == date_choice)
+  if (date_choice >= as.Date('2015-10-01')) {
+    rus_map_noCrimea <- rus_map %>%
+      mutate(name = droplevels(replace(name, name == "Крымский федеральный округ", 'Южный федеральный округ')))
+    plot_data <- rus_map_noCrimea %>%
+      left_join(data_date)
+  } else {
+    plot_data <- rus_map %>%
+      left_join(data_date)
+  }
+  
+  patterns = c("Северо-Западный федеральный округ", "Сибирский федеральный округ", "Уральский федеральный округ", "Дальневосточный федеральный округ", "Южный федеральный округ", 
+               "Приволжский федеральный округ", "Центральный федеральный округ", "Северо-Кавказский федеральный округ")
+  replacement = c("СЗФО", "СФО", "УФО", "ДФО", "ЮФО", "ПФО", "ЦФО", "СКФО")
+  
+  plot_data <- plot_data %>%
+    mutate(name = str_replace_all(name, setNames(replacement, patterns)))
+  
+  # breaks <- log_breaks(n=5, base=10)(limits)
+  t <- ggplot(plot_data, aes(x=long, y=lat, fill=value, text=paste('Производство, ', name, ', ', format(date_choice, '%b %y'), ': ', round(value,2), ' ', ed, sep=''))) + 
+    coord_fixed(ratio = 2) +
+    geom_polygon(colour="black", size=0.1, aes(group=group)) +
+    scale_fill_gradient(name=paste('Производство, ', ed, sep=''), limits=limits, trans='log10') +
+    theme_void()
+  t
+  t <- ggplotly(t, tooltip='text') %>% config(displayModeBar = F) %>%
+    # layout(legend = list(orientation = "h", x = 0, y = -0.1)) %>%
+    layout(plot_bgcolor  = "rgba(0, 0, 0, 0)",
+           paper_bgcolor = "rgba(0, 0, 0, 0)", xaxis = list(showgrid = FALSE, showline=FALSE, fixedrange = TRUE), yaxis = list(showgrid = FALSE, showline=FALSE, fixedrange = TRUE)) %>%
+    config(locale = 'ru')
+  t
+}
+plot_map <- function(level, data, sa, date_choice) {
+  ed <- data$ed
+  if (level=='reg') {
+    grid <- read.table('data_output/rus_grid_reg2.csv', header=TRUE) %>%
+      mutate(code = ifelse(nchar(code)==10, paste0('0', code), code)) %>%
+      select(-code_FD, -FD) %>% rename("name" = "name_short")
+    df <- data$df_reg %>% mutate(value = ifelse(value==0, NA, value))
+    # limits <- c(min(df$value, na.rm=TRUE), max(df$value, na.rm=TRUE))
+    date_choice=as.Date(date_choice)
+    data_date <- df %>%
+      filter(date == date_choice) %>%
+      right_join(grid, by=c("OKATO_id" = "code")) %>% select(-row, -col) %>% rename("code" = "OKATO_id")
+  }
+  if (level=='FD') {
+    grid <- read.table('data_output/rus_grid_reg2.csv', header=TRUE) %>%
+      mutate(code = ifelse(nchar(code)==10, paste0('0', code), code)) %>%
+      mutate(code_FD = ifelse(nchar(code_FD)==2, paste0('0', code_FD), code_FD))
+    if (sa) {
+      df <- data$df_FD_sa %>% mutate(value = ifelse(value==0, NA, value))
+    } else{
+      df <- data$df_FD %>% mutate(value = ifelse(value==0, NA, value))
+    }
+    # limits <- c(min(df$value, na.rm=TRUE), max(df$value, na.rm=TRUE))
+    date_choice=as.Date('2021-01-01')
+    data_date <- df %>%
+      filter(date == date_choice) %>%
+      left_join(grid, by=c("OKATO_id" = "code_FD"))
+    grid <- grid %>% select(-code_FD) %>% rename("name" = "FD")
+  }
+  p <- data_date %>% ggplot() +
+    # statebins:::geom_rrect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2),
+    #                        fill = '#d0e1e1',
+    #                        color=NA, alpha=0.7) +
+    # statebins:::geom_rrect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2, fill = value),
+    #                        color=NA, alpha=1) +
+    # annotate("rect", xmin = 1, xmax = 3, ymin = 1, ymax = 3, 
+    #          fill="#d0e1e1", color=NA, size=0.5, alpha=0.7) +
+    geom_rect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2),
+              fill = '#d0e1e1',
+              color=NA, alpha=0.7) +
+    geom_rect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2, fill=value),
+              color=NA, alpha=1) +
+    facet_geo(~ code, grid = grid) +
+    labs(x='', y='') +
+    scale_fill_gradient(name=paste('Производство, ', ed, sep='')) +
+    theme_minimal() + 
+    theme(aspect.ratio = 1) +
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          axis.title.y=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks.y=element_blank(),
+          strip.placement = "bottom",
+          plot.title = element_text(hjust = 5),
+          strip.background = element_blank(),
+          strip.text.x = element_blank(), 
+          line = element_blank(),
+          plot.margin = margin(-2, "points"),
+          panel.spacing = unit(-2, "points")
+          )
+  if (level=='reg') {
+    p <- p + geom_text(aes(x = 1.5, y = 1.5, label = name, text=""), col="white")
+  } else {
+    p <- p + geom_text(aes(x = 1.5, y = 1.5, label = FD,  text=""), col="white")
+  }
+  p <- ggplotly(p, height=600) %>%
+    config(doubleClick = F, displayModeBar = F) %>% layout(dragmode=FALSE, plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)", 
+                                          xaxis = list(showgrid = FALSE, showline=FALSE, fixedrange = TRUE), yaxis = list(showgrid = FALSE, showline=FALSE, fixedrange = TRUE)) %>% 
+    config(locale = 'ru')
+  # p$x$data <- modify_depth(p$x$data, 1, function(x) {
+  #   # x[["hoverinfo"]] = ifelse(!x[["hoveron"]]=="fills", "none", x[["hoverinfo"]])
+  #   x$hoveron
+  # }) 
+  idx <- which(unlist(lapply(p$x$data, function(x) x$hoveron=="fills")))
+  p$x$data[idx] <- lapply(p$x$data[idx], function(x) x <- list_modify(x, hoverinfo="none"))
+  p
+}
