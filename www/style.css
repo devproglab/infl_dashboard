@@ -37,7 +37,7 @@ body {
 
 .grid-container {
   display: grid;
-  grid-template-columns: 355px 1fr;
+  grid-template-columns: 400px 1fr;
   grid-template-rows: 54px 0.05fr 1fr 45px;
   grid-template-areas: "header header" "sidenav cards" "sidenav main" "footer footer";
   height: 100vh;
@@ -91,7 +91,6 @@ body {
   color: #737373;
   margin: 6px 0px 6px 10px;
   border-left: 1px solid darkgray;
-  width: 290px;
   font-size: 12px;
   height:100%;
 }
@@ -280,4 +279,9 @@ body {
 }
 .primarySet-60 {
     justify-content: flex-end!important;
+}
+.datepicker {
+  position:relative!important;
+  top:0!important;
+  left:0!important;
 }

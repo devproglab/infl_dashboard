@@ -10,10 +10,11 @@ using <- function(...) {
   # }
 }
 
-using("data.table", "readxl", "dplyr", "xts", "plotly", "stats", "writexl",
-      "lubridate", "ggplot2", "shiny", "scales", "flexdashboard", "RColorBrewer", "clock",
-      "downloadthis", "glue", "leaflet", "sass", "shiny", "shiny.fluent", "shiny.router",
-      "shinycssloaders", "shinyjs", "stringr", "tmap", "sf", 'shinyWidgets', "geofacet", "purrr")
+using('data.table', 'readxl', 'dplyr', 'xts', 'plotly', 'stats', 'writexl',
+      'lubridate', 'ggplot2', 'shiny', 'scales', 'flexdashboard', 'RColorBrewer', 'clock',
+      'downloadthis', 'glue', 'leaflet', 'sass', 'shiny', 'shiny.fluent', 'shiny.react', 'shiny.router',
+      'shinycssloaders', 'shinyjs', 'stringr', 'tmap', 'sf', 'shinyWidgets', 'geofacet', 'purrr', 'reshape2', 'tidyr', 'forcats',
+      'htmltools')
 
 theme_set(theme_minimal())
 options(scipen=999)
@@ -441,53 +442,49 @@ production_map <- function(data, rus_map, date_choice, sa = TRUE) {
     config(locale = 'ru')
   t
 }
-plot_map <- function(level, data, sa, date_choice) {
+plot_map <- function(level_fed, data, date_choice, dynam) {
   ed <- data$ed
-  if (level=='reg') {
-    grid <- read.table('data_output/rus_grid_reg2.csv', header=TRUE) %>%
+  if (length(date_choice)==0) {
+    date_choice = last(df$date)
+  }
+  date_choice=floor_date(as.Date(date_choice), unit='months')
+  if (!level_fed) {
+    grid <- read.table('data_output/rus_grid_reg2.csv', header=TRUE, sep=',') %>%
       mutate(code = ifelse(nchar(code)==10, paste0('0', code), code)) %>%
       select(-code_FD, -FD) %>% rename("name" = "name_short")
     df <- data$df_reg %>% mutate(value = ifelse(value==0, NA, value))
-    # limits <- c(min(df$value, na.rm=TRUE), max(df$value, na.rm=TRUE))
-    date_choice=as.Date(date_choice)
-    data_date <- df %>%
-      filter(date == date_choice) %>%
-      right_join(grid, by=c("OKATO_id" = "code")) %>% select(-row, -col) %>% rename("code" = "OKATO_id")
+    if (dynam) {
+      data_date <- df %>% group_by(OKATO_id) %>% mutate(value = (value/lag(value, 12) - 1)*100 ) %>%
+        filter(date == date_choice) %>%
+        right_join(grid, by=c("OKATO_id" = "code")) %>% select(-row, -col) %>% rename("code" = "OKATO_id")
+    } else {
+      data_date <- df %>%
+        filter(date == date_choice) %>%
+        right_join(grid, by=c("OKATO_id" = "code")) %>% select(-row, -col) %>% rename("code" = "OKATO_id")
+    }
   }
-  if (level=='FD') {
-    grid <- read.table('data_output/rus_grid_reg2.csv', header=TRUE) %>%
+  if (level_fed) {
+    grid <- read.table('data_output/rus_grid_reg2.csv', header=TRUE, sep=',') %>%
       mutate(code = ifelse(nchar(code)==10, paste0('0', code), code)) %>%
       mutate(code_FD = ifelse(nchar(code_FD)==2, paste0('0', code_FD), code_FD))
-    if (sa) {
-      df <- data$df_FD_sa %>% mutate(value = ifelse(value==0, NA, value))
-    } else{
-      df <- data$df_FD %>% mutate(value = ifelse(value==0, NA, value))
+    df <- data$df_FD %>% mutate(value = ifelse(value==0, NA, value))
+    if (dynam) {
+      data_date <- df %>% group_by(OKATO_id) %>% mutate(value = (value/lag(value, 12) - 1)*100 ) %>%
+        filter(date == date_choice) %>%
+        right_join(grid, by=c("OKATO_id" = "code_FD")) %>% select(-row, -col)
+    } else {
+      data_date <- df %>%
+        filter(date == date_choice) %>%
+        right_join(grid, by=c("OKATO_id" = "code_FD"))
     }
-    # limits <- c(min(df$value, na.rm=TRUE), max(df$value, na.rm=TRUE))
-    date_choice=as.Date('2021-01-01')
-    data_date <- df %>%
-      filter(date == date_choice) %>%
-      left_join(grid, by=c("OKATO_id" = "code_FD"))
     grid <- grid %>% select(-code_FD) %>% rename("name" = "FD")
   }
   p <- data_date %>% ggplot() +
-    # statebins:::geom_rrect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2),
-    #                        fill = '#d0e1e1',
-    #                        color=NA, alpha=0.7) +
-    # statebins:::geom_rrect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2, fill = value),
-    #                        color=NA, alpha=1) +
-    # annotate("rect", xmin = 1, xmax = 3, ymin = 1, ymax = 3, 
-    #          fill="#d0e1e1", color=NA, size=0.5, alpha=0.7) +
-    geom_rect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2),
-              fill = '#d0e1e1',
-              color=NA, alpha=0.7) +
-    geom_rect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2, fill=value),
-              color=NA, alpha=1) +
+    geom_rect(mapping=aes(xmin=1, xmax=2, ymin=1, ymax=2, fill=value, text=""),
+                                          color=NA, alpha=1) +
     facet_geo(~ code, grid = grid) +
     labs(x='', y='') +
-    scale_fill_gradient(name=paste('Производство, ', ed, sep='')) +
     theme_minimal() + 
-    theme(aspect.ratio = 1) +
     theme(axis.title.x=element_blank(),
           axis.text.x=element_blank(),
           axis.ticks.x=element_blank(),
@@ -502,12 +499,57 @@ plot_map <- function(level, data, sa, date_choice) {
           plot.margin = margin(-2, "points"),
           panel.spacing = unit(-2, "points")
           )
-  if (level=='reg') {
-    p <- p + geom_text(aes(x = 1.5, y = 1.5, label = name, text=""), col="white")
+
+  if (dynam) {
+    p <- p + scale_fill_gradientn(name='Темпы роста, % г/г',
+                                  colours=c("#e83131", "#ffbfbf", "white", "#c3ffbf","#3AE831"),
+                                  na.value="#D0D0D0",
+                                  oob=oob_squish,
+                                  # trans="pseudo_log",
+                                  values=rescale(c(-10,-0.00000001,0,0.000000001,10)),
+                                  n.breaks=4,
+                                  minor_breaks = NULL,
+                                  limits=c(-10,10))
+    # p <- p + scale_fill_manual(name='Темпы роста производства, %',
+    #                               values=c("1" = "#FF0000", "2" = "#e83131", "3" = "#ffbfbf", "4" = "#c3ffbf", "5" = "#3AE831", "6" = "#0dff00"),
+    #                               na.value="#D0D0D0")
+    # p <- p + binned_scale("fill",
+    #                           "foo",
+    #                           ggplot2:::binned_pal(scales::manual_pal(c("#FF0000","#e83131","#ffbfbf","#c3ffbf", "#3AE831", "#0dff00"))),
+    #                           guide="coloursteps",
+    #                           breaks=c(-10,-5,0,5,10),
+    #                           limits=c(-10, 10),
+    #                           oob=oob_squish,
+    #                           na.value="#D0D0D0",
+    #                       show.limits = TRUE,
+    #)
   } else {
-    p <- p + geom_text(aes(x = 1.5, y = 1.5, label = FD,  text=""), col="white")
+    p <- p + scale_fill_gradient(name=paste('Производство, ', ed, sep=''), na.value="#D0D0D0", high="#85D6FF", low = "#0078D4")
   }
-  p <- ggplotly(p, height=600) %>%
+  if (!level_fed) {
+    p <- p + geom_text(aes(x = 1.5, y = 1.5, label = name, 
+                           text=paste0(name_long, ', ', as.yearmon(date_choice), ': ', ifelse(is.na(value),
+                                                                                              'нет данных',
+                                                                                              paste0(round(value, 1), ifelse(dynam,
+                                                                                                                             '%',
+                                                                                                                             paste0(' ', ed))
+                                                                                                     )
+                                                                                              )
+                                       )
+                           ), col="white", size=4)
+  } else {
+    p <- p + geom_text(aes(x = 1.5, y = 1.5, label = paste0(name_short, '\n', FD), 
+                           text=paste0(FD, ', ', as.yearmon(date_choice), ': ', ifelse(is.na(value),
+                                                                                       'нет данных',
+                                                                                       paste0(round(value, 1), ifelse(dynam,
+                                                                                                                      '%',
+                                                                                                                      paste0(' ', ed))
+                                                                                              )
+                                                                                       )
+                                       )
+                           ), col="white", size=4)
+  }
+  p <- ggplotly(p, height=600, tooltip='text') %>%
     config(doubleClick = F, displayModeBar = F) %>% layout(dragmode=FALSE, plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)", 
                                           xaxis = list(showgrid = FALSE, showline=FALSE, fixedrange = TRUE), yaxis = list(showgrid = FALSE, showline=FALSE, fixedrange = TRUE)) %>% 
     config(locale = 'ru')
@@ -517,5 +559,169 @@ plot_map <- function(level, data, sa, date_choice) {
   # }) 
   idx <- which(unlist(lapply(p$x$data, function(x) x$hoveron=="fills")))
   p$x$data[idx] <- lapply(p$x$data[idx], function(x) x <- list_modify(x, hoverinfo="none"))
+  p 
+}
+
+
+plot_trade <- function(data, date_choice) {
+  ed <- data$ed
+  df <- data$trade_concentr %>%
+    pivot_longer(-date) %>% filter(!name %in% c('HHI_im', 'HHI_ex')) %>% 
+    mutate(name = case_when(
+      name == 'HHI_im_sa' ~ 'Импорт',
+      name == 'HHI_ex_sa' ~ 'Экспорт'
+    )) 
+  p1 <- df %>% ggplot() +
+    geom_line(aes(x=date, y=value, col=name, text=paste0('Индекс географической концентрации',
+                                                         ifelse(name=="Экспорт", ' экспорта', ' импорта'),
+                                                         ', ',
+                                                         as.yearmon(date),
+                                                         ': ',
+                                                         round(value, 2)),
+                  group=name)) +
+    geom_text(data=last(df %>% filter(name=='Экспорт')), aes(x=date, y=value), label="Экспорт", vjust=1.5) +
+    geom_text(data=last(df %>% filter(name=='Импорт')), aes(x=date, y=value), label="Импорт", vjust=1.5) +
+    scale_color_manual(values=c("Экспорт" = 'red', "Импорт" = 'blue'), name='Индекс концентрации') +
+    xlab('') +
+    ylab('Пункты') +
+    theme(legend.position="none")
+  p1 <- ggplotly(p1, height=700, tooltip='text') %>%
+    config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
+  df <- data$trade_shares
+  p2 <- df %>% ggplot() +
+    geom_line(aes(x=date, y=share, col=type, text=paste0('Доля',
+                                                         ifelse(type=="Экспорт", ' экспорта', ' импорта'),
+                                                         ' от внутреннего производства, ',
+                                                         as.yearmon(date),
+                                                         ': ',
+                                                         round(share, 2), 
+                                                         '%'),
+                  group=type)) +
+    geom_text(data=last(df %>% filter(type=='Экспорт')), aes(x=date, y=share), label="Экспорт", vjust=1.5) +
+    geom_text(data=last(df %>% filter(type=='Импорт')), aes(x=date, y=share), label="Импорт", vjust=1.5) +
+    scale_color_manual(values=c("Экспорт" = 'red', "Импорт" = 'blue'), name='Доля от внутреннего производства') +
+    xlab('') +
+    ylab('Проценты') +
+    theme(legend.position="none")
+  p2 <- ggplotly(p2, height=700, tooltip='text') %>%
+    config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
+  p2
+  if (length(date_choice)==0) {
+    date_choice = last(df$date)
+  }
+  date_choice=floor_date(as.Date(date_choice), unit='months')
+  df <- data$trade_country %>% filter(date == date_choice) %>% mutate(NAPR = case_when(
+    NAPR=='ИМ' ~ 'Импорт',
+    NAPR=='ЭК' ~ 'Экспорт'))
+  p3 <- df %>%
+    arrange(NAPR, rev(STRANA), value) %>%
+    group_by(NAPR) %>%
+    mutate(label_y = cumsum(value) - 0.5*value) %>%
+    ggplot(aes(x=NAPR, y = value, fill = STRANA)) +
+    geom_col(stat_count="identity", aes(text=paste0(NAPR,
+                             ' в ',
+                             STRANA,
+                             ', ',
+                             as.yearmon(date),
+                             ': ',
+                             format(round(value), big.mark=" "),
+                             ' ',
+                             ed
+                             ))) +
+    geom_text(aes(y = label_y, label = ifelse(STRANA=='Прочие', "", STRANA)),  colour = "white") +
+    # facet_wrap(NAPR~., scale='free_y') + 
+    xlab('') +
+    ylab(ed) +
+    scale_y_continuous(labels = function(x) format(x, big.mark = " ")) +
+    theme(legend.position="none")
+  p3 <- ggplotly(p3, height=900, tooltip='text') %>%
+    config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)") 
+  idx <- which(unlist(lapply(p3$x$data, function(x) !is.null(x$hoveron))))
+  p3$x$data[idx] <- lapply(p3$x$data[idx], function(x) x <- list_modify(x, hoverinfo="none"))
+  # fig1 <- subplot(p1, p2, nrows = 2, margin = 0.05)
+  # fig2 <- subplot(p3, nrows = 1, margin = 0.05)
+  # fig <- subplot(fig1, fig2, nrows = 2, margin = 0.05)
+  # fig
+  fig4 <- subplot(style(p3, showlegend=F), p1, style(p2, showlegend=F), nrows = 3, margin = 0.05)
+  annotations = list( 
+    list( 
+      x = 0.5,  
+      y = 1.0,  
+      text = "Крупнейшие торговые партнеры",  
+      xref = "paper",  
+      yref = "paper",  
+      xanchor = "center",  
+      yanchor = "bottom",  
+      showarrow = FALSE 
+    ),  
+    list( 
+      x = 0.5,  
+      y = 2/3 - 0.05,  
+      text = "Индексы географической концентрации",  
+      xref = "paper",  
+      yref = "paper",  
+      xanchor = "center",  
+      yanchor = "bottom",  
+      showarrow = FALSE 
+    ),  
+    list( 
+      x = 0.5,  
+      y = 1/3 - 0.05,  
+      text = "Доля внешней торговли от внутреннего производства",  
+      xref = "paper",  
+      yref = "paper",  
+      xanchor = "center",  
+      yanchor = "bottom",  
+      showarrow = FALSE 
+    )
+    )
+  fig4 %>% layout(annotations = annotations) %>%
+    config(doubleClick = F, displayModeBar = F) %>% layout(dragmode=FALSE,  
+                                                           xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE)) %>% 
+    config(locale = 'ru')
+}
+
+trade_prices <- function(data, convert) {
+  df <- data$trade_price
+  ed <- tolower(df$EDIZM[1])
+  p <- df %>% mutate(NAPR = case_when(NAPR=='ЭК' ~ "Экспорт", NAPR=='ИМ' ~ 'Импорт')) 
+  if (convert) {
+    p <- p %>% ggplot(aes(x=date, y=mean_price_rub))
+  } else {
+    p <- p %>% ggplot(aes(x=date, y=mean_price))
+  }
+    p <- p + geom_line(aes(col=NAPR, text=paste0('Средняя цена',
+                                                         ifelse(NAPR=="Экспорт", ' экспорта', ' импорта'),
+                                                         ', ',
+                                                         as.yearmon(date),
+                                                         ': ',
+                                                         round(mean_price, 2), 
+                                                         ifelse(convert, 'руб./', '$/'), ed),
+                  group=NAPR)) +
+    geom_text(data=last(df %>% filter(NAPR=='Экспорт')), aes(x=date, y=mean_price), label="Экспорт", vjust=1.5) +
+    geom_text(data=last(df %>% filter(NAPR=='Импорт')), aes(x=date, y=mean_price), label="Импорт", vjust=1.5) +
+    scale_color_manual(values=c("Экспорт" = 'red', "Импорт" = 'blue'), name='Доля от внутреннего производства') +
+    xlab('') +
+    ylab(paste0(ifelse(convert, 'руб./', '$/'), ed)) +
+    theme(legend.position="none")
+  p <- ggplotly(p, tooltip='text') %>%
+    config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
+  p
+}
+prod_prices <- function(data) {
+  df <- data$prod_price
+  # ed <- tolower(df$EDIZM[1])
+  p <- df %>% ggplot() + geom_line(aes(x=date, y=value, col='blue', text=paste0('Средние цены производителей',
+                                               ', ',
+                                               as.yearmon(date),
+                                               ': ',
+                                               round(value, 2), 
+                                               'руб.'),
+                         group=1)) +
+    xlab('') +
+    ylab('руб.') +
+    theme(legend.position='none')
+  p <- ggplotly(p, tooltip='text') %>%
+    config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
   p
 }

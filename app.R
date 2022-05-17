@@ -1,6 +1,7 @@
 #---------------------------------------------------------------------------------------------------
 # Load libraries, functions & dependencies
 #---------------------------------------------------------------------------------------------------
+options(encoding = "UTF-8")
 source('plots.R')
 shiny::addResourcePath("shiny.router", system.file("www", package = "shiny.router"))
 shiny_router_js_src <- file.path("shiny.router", "shiny.router.js")
@@ -12,7 +13,6 @@ shiny_router_script_tag <-
 #---------------------------------------------------------------------------------------------------
 # Set encoding
 Sys.setlocale('LC_TIME', 'Russian')
-options(encoding = "UTF-8")
 # Prepare Russian month labels for graphs
 labelset <- clock_labels_lookup('ru')[[2]]
 labelset <- substr(labelset, 1, nchar(labelset) - 1)
@@ -63,7 +63,6 @@ for (i in 2:length(markets)) {
   elem <- list(key = markets[i], text = markets[i])
   options[[i]] <- elem
 }
-
 
 rus_map <- readRDS('data_output/federal_districts.rds')
 
@@ -144,6 +143,73 @@ lay <- function(mainUI) {
   )
 }
 
+info_card <- function(text, toggle_id = NULL, toggleOn = NULL, toggleOff = NULL, download_id = NULL, panel = FALSE) {
+  tags$div(
+    tags$div(text,
+             style="flex-basis: 70%;"),
+    tags$div(
+      if (!is.null(toggle_id)) {
+        tags$div(Toggle.shinyInput(toggle_id, value = TRUE,
+                                   label = "",
+                                   onText = toggleOn,
+                                   offText = toggleOff 
+        ))
+      },
+    tags$div(
+        if (!panel) {
+        CommandBar(
+        items = list(
+           CommandBarItem("Скачать", "Download", id=download_id, onClick=JS(paste0("function() { window.location.href = $('#", download_id, '_shadow', "').attr('href'); }")))
+        ))
+        } else {
+          CommandBar(
+            items = list(
+              CommandBarItem("Скачать", "Download", id=download_id, onClick=JS(paste0("function() { window.location.href = $('#", download_id, '_shadow', "').attr('href'); }"))),
+              CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
+            ))
+        }
+        ),
+      style='display:flex; flex-wrap:nowrap; flex-direction:column;justify-content: space-around; align-items:center;'),
+    style="display:flex; flex-wrap:nowrap;justify-content: space-between; margin-top:15px;", class="text-card ms-depth-8")
+}
+
+calendar_temp <- function(id, date_first, date_last) {
+  
+  Calendar.shinyInput(id, showGoToToday=FALSE, 
+                      isDayPickerVisible = FALSE,
+                      isMonthPickerVisible = TRUE,
+                      highlightSelectedMonth = TRUE,
+                      autoNavigateOnSelection = FALSE,
+                      strings = JS("
+                                                {
+                                                  months: [
+                                                    'Январь',
+                                                    'Февраль',
+                                                    'Март',
+                                                    'Апрель',
+                                                    'Май',
+                                                    'Июнь',
+                                                    'Июль',
+                                                    'Август',
+                                                    'Сентбярь',
+                                                    'Октябрь',
+                                                    'Ноябрь',
+                                                    'Декабрь',
+                                                  ],
+                                                  shortMonths: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июнь', 'Июль', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
+                                                  prevYearAriaLabel: 'Предыдущий год,',
+                                                  nextYearAriaLabel: 'Следующий год,',	
+                                                  nextYearRangeAriaLabel:	'Следующее десятилетие,',
+                                                  prevYearRangeAriaLabel: 'Предыдущее десятилетие, ',	
+                                                }
+                                                "),
+                      # formatDate=JS("(date) => {return !date ? '' : (date.getMonth() + 1) + '/' + (date.getFullYear()) }"),
+                      maxDate=JS(paste("new Date('", year(date_last), "-", ifelse(nchar(month(date_last))==1, paste0(0, month(date_last)), month(date_last)),  "-31')", sep='')),
+                      minDate=JS(paste0("new Date('", as.character(date_first), "')")),
+                      value=JS(paste("new Date('", year(date_last), "-", ifelse(nchar(month(date_last))==1, paste0(0, month(date_last)), month(date_last)),  "-01')", sep='')))
+}
+
+
 #---------------------------------------------------------------------------------------------------
 # Define layout elements and pages
 #---------------------------------------------------------------------------------------------------
@@ -151,7 +217,7 @@ lay <- function(mainUI) {
 header <- tagList(
   div(class = 'logo-block',
   Link(href = '/', img(src = "hse-logo.png", class = "logo")),
-  div(Link(href = '/', Text(variant = "xLarge", "Анализ потребительских цен"), class = 'title-link'), class = "title")
+  div(Link(href = '/', Text(variant = "xLarge", "Анализ потребительских рынков"), class = 'title-link'), class = "title")
   )
 )
 # Sidebar navigation & product choice
@@ -165,10 +231,10 @@ navigation <- tagList (
         icon = 'Home'
       ),
       list(
-        name = 'Потребительские цены',
-        url = '#!/cons',
-        key = 'cons',
-        icon = 'CalculatorPercentage'
+        name = 'Анализ предложения на рынке',
+        url = '#!/market',
+        key = 'market',
+        icon = 'PieDouble'
       ),
       list(
         name = 'Цены производителей, импорта и экспорта',
@@ -177,10 +243,10 @@ navigation <- tagList (
         icon = 'CalculatorPercentage'
       ),
       list(
-        name = 'Анализ предложения на рынке',
-        url = '#!/market',
-        key = 'market',
-        icon = 'PieDouble'
+        name = 'Потребительские цены',
+        url = '#!/cons',
+        key = 'cons',
+        icon = 'CalculatorPercentage'
       )
     ))),
     initialSelectedKey = 'home',
@@ -231,80 +297,39 @@ cards <- htmlOutput('card_set')
 # Home page
 home_page <- makePage(title = 'Факторный анализ потребительских цен',
                       subtitle = "Общие сведения",
-                      contents = htmlOutput('main_loader'))
-# constuct tabs for Consumer Prices page
+                      contents = "<Description of the dashboard's main features>")
+# construct tabs for Consumer Prices page
 pivot_consumer <- Pivot(
   PivotItem(headerText = "Изменение цен - г/г", 
-            tags$br(),
-            tags$span(
-            tags$table(tags$tr(
-              tags$td("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
-Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
-                      , width='80%'),
-              tags$td(span(CommandBar(
-                  items = list(
-                    CommandBarItem("Скачать", "Download", id="download_yearly", onClick=JS("function() { window.location.href = $('#download_yearly_shadow').attr('href'); }")),
-                    CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
-                  )
-                ),style="display:block;"), width='20%', align='right')
-            )),
-            class="ms-depth-8 text-card"),
-            tags$table( width='100%',
-                        tags$tr(
-                          tags$td('Динамика цен', width='60%'),
-                          tags$td('Результаты моделирования, с 2015 года', width='40%'),
-                          style="font-weight: bold; text-align:center;"
-                        ),
-                        tags$tr(
-                          tags$td(
-                            plotlyOutput('price_yoy')),
-                          tags$td(tableOutput('impacts'), valign='top')
-                        )
-            )),
-  PivotItem(headerText = "Изменение цен - м/м", 
-            tags$br(),
-            tags$span(
-              tags$table(tags$tr(
-                tags$td("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
-Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
-                        , width='80%'),
-                tags$td(span(CommandBar(
-                  items = list(
-                    CommandBarItem("Скачать", "Download", id="download_monthly", onClick=JS("function() { window.location.href = $('#download_mom_shadow').attr('href'); }")),
-                    CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
-                  )
-                ), style="display:block;"), width='20%', align='right')
-              )),
-              class="ms-depth-8 text-card"),
-            tags$table(width='100%', 
-                       tags$thead(
-                         tags$th('Динамика цен', width='60%'),
-                         tags$th('Пояснения', width='40%')
-                       ),
-                       tags$tr(tags$td(plotlyOutput('price_mom')))
-                       )),
-  PivotItem(headerText = "Структура розничной цены", 
-            tags$br(),
-            tags$span(
-              tags$table(tags$tr(
-                tags$td("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
-Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
-                        , width='80%'),
-                tags$td(span(CommandBar(
-                  items = list(
-                    CommandBarItem("Скачать", "Download", id="download_struct", onClick=JS("function() { window.location.href = $('#download_str_shadow').attr('href'); }"))                  )
-                ), style="display:block;"), width='20%', align='right')
-              )),
-              class="ms-depth-8 text-card"),
-            tags$table(width='100%', 
-                       tags$thead(
-                         tags$th('Динамика цен', width='60%'),
-                         tags$th('Пояснения', width='40%')
-                       ),
-                       tags$tr(
-              tags$td(plotlyOutput('price_structure'))
+            info_card(text = tags$span("На графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.",
+                                       tags$br(),
+                                       "Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта.",
+                                       tags$br(),
+                                       'Подробное описание используемых в анализе факторов доступно в разделе "Пояснения к факторам"'),
+                      download_id = "download_yearly",
+                      panel = TRUE),
+            tags$div(
+              tags$div(plotlyOutput('price_yoy'), style='flex-basis: 70%;'),
+              tags$div(tableOutput('impacts')),
+              style="display:flex; flex-wrap:nowrap;justify-content: space-around;"
             )
-            ))
+            ),
+  PivotItem(headerText = "Изменение цен - к предыдущему периоду", 
+            info_card(text = tags$span("На графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с предыдущим месяцем/неделей. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.",
+                                       tags$br(),
+                                       "Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта.",
+                                       tags$br(),
+                                       'Подробное описание используемых в анализе факторов доступно в разделе "Пояснения к факторам"'),
+                      download_id = "download_monthly",
+                      panel = TRUE),
+            plotlyOutput('price_mom')
+            ),
+  PivotItem(headerText = "Структура розничной цены", 
+            info_card(text = tags$span("На графике представлена динамика средней цены выбранного товара в разбивке по основным статьям структуры розничной цены (согласно ежегодным данным Росстата)."),
+                      download_id = "download_struct",
+                      pane = TRUE),
+            plotlyOutput('price_structure')
+            )
 )
 # Consumer prices page
 cons_page <- makePage(
@@ -317,87 +342,114 @@ cons_page <- makePage(
          downloadLink("download_str_shadow", "Скачать данные в .xlsx"),
          style='visibility:hidden; overflow:hidden;'),
     pivot_consumer,
-    style='height:600px;'
+    style='height:1000px;'
   )
 )
+
 # Producer, import & export prices page
+pivot_prodprices <- Pivot(
+  PivotItem(headerText = 'Цены производителей',
+            info_card(text = tags$span("На графике изображены средние отпускные цены производителей промышленной продукции для товаров, входящих в рассматриваемую товарную группу."),
+                      # toggle_id = "sa_toggle",
+                      # toggleOn = "Сезонное сглаживание включено",
+                      # toggleOff = "Сезонное сглаживание отключено",
+                      download_id = "download_yearly"),
+            htmlOutput('prod_prices_categ'),
+            plotlyOutput('prod_prices')),
+  PivotItem(headerText = 'Внешнеторговые цены',
+            info_card(text = tags$span("На графике изображены средние цены импорта и экспорта товаров, входящих в рассматриваемые товарные группы. Они получены как частное общей стоимости проданной продукции и ее количества в натуральном выражении.",
+                                       tags$br(), "По умолчанию результат конвертируется в рубли по среднемесячному валютному курсу. Для отображения исходных данных в долларах США необходимо воспользоваться переключателем справа. "),
+                      toggle_id = "usd_toggle",
+                      toggleOn = "Конвертация цен в рубли включена",
+                      toggleOff = "Конвертация цен в рубли отключена",
+                      download_id = "download_yearly"),
+            plotlyOutput('trade_prices'))
+)
 prod_page <- makePage(
   title = "Динамика цен производителей, импорта и экспорта",
-  subtitle = ".....",
+  subtitle = "По данным Росстата и ФТС",
   contents = div(
-
+    pivot_prodprices,
     style='height:600px;'
   )
 )
 
 # Market analysis page
-datepicker <- airMonthpickerInput(inputId = "date_map",
-                                  inline = TRUE,
-                                  language = 'ru',
-                                  value = as.Date('2022-02-01'),
-                                  minDate = as.Date('2011-01-01'),
-                                  maxDate = as.Date('2022-02-01'))
-pivot_graphs <- tags$table(width='100%', tags$tr(
-  tags$td(
-    shinycssloaders::withSpinner(plotlyOutput('supply_analysis'), type=6),
-    width="100%", colspan=2)
-),
-tags$tr(tags$td(
-  h4('На графике ниже представлена географическая структура производства товара')
-)),
-tags$tr(
-  tags$td(
-    # shinycssloaders::withSpinner(plotlyOutput('supply_map'), type=6)
-    plotlyOutput('map_sa')
-  )
+pivot_market_monthly <- Pivot(
+  PivotItem(headerText = "Динамика совокупного предложения", 
+            info_card(text = tags$span("На графике представлена динамика расчетного объема совокупного предложения на рынке. Предложение складывается из внутреннего производства, изменения запасов и сальдо чистого экспорта.",
+                            tags$br(), "Все расчёты производится в натуральном выражении. По умолчанию используются сезонно-сглаженные данные. Для отображения исходных значений необходимо воспользоваться переключателем справа."),
+                      toggle_id = "sa_toggle",
+                      toggleOn = "Сезонное сглаживание включено",
+                      toggleOff = "Сезонное сглаживание отключено",
+                      download_id = "download_yearly"),
+            plotlyOutput('supply_analysis')
+            ),
+  PivotItem(headerText = "Географическая структура производства",
+            info_card(text = tags$span("Карта отражает географическое распределение внутреннего производства товара в России. Выбор анализируемого периода производится с помощью календаря справа от карты. По умолчанию данные представлены на уровне федеральных округов. 
+                       Для отображения данных на уровне отдельных субъектов РФ необходимо воспользоваться переключателем", tags$sup("*"),
+                      tags$br(), tags$sub("*Региональные данные не всегда полны ввиду необходимости обеспечения конфиденциальности первичной статистической информации.")),
+                      toggle_id = "map_volume_toggle",
+                      toggleOn = "Данные по федеральным округам",
+                      toggleOff = "Данные по субъектам федерации",
+                      download_id = "download_yearly"),
+            tags$table(width="100%",
+                       tags$tr(
+                         tags$td(plotlyOutput('map_volume'), width="80%"),
+                         tags$td(
+                           calendar_temp('date_map_volume', date_first=as.Date('2011-01-01'), date_last=as.Date('2022-01-01')),
+                           width="20%", valign='bottom', align='center', style='padding-bottom:10%;')
+                       ))
+  ),
+  PivotItem(headerText = "Региональная динамика производства",
+            info_card(text = tags$span("Карта отражает динамику внутреннего производства товара в России. Выбор анализируемого периода производится с помощью календаря справа от карты. По умолчанию данные представлены на уровне федеральных округов. 
+                       Для отображения данных на уровне отдельных субъектов РФ необходимо воспользоваться переключателем справа", tags$sup("*"), ".",
+                                       tags$br(),
+                                       tags$sub("*Региональные данные не всегда полны ввиду необходимости обеспечения конфиденциальности первичной статистической информации.")),
+                      toggle_id = "map_dynam_toggle",
+                      toggleOn = "Данные по субъектам федерации",
+                      toggleOff = "Данные по федеральным округам",
+                      download_id = "download_yearly"),
+            tags$table(width="100%",
+                       tags$tr(
+                         tags$td(plotlyOutput('map_dynam'), width="80%"),
+                         tags$td(
+                           calendar_temp('date_map_dynam', date_first=as.Date('2012-01-01'), date_last=as.Date('2022-01-01')),
+                           width="20%", valign='bottom', align='center', style='padding-bottom:10%;')
+                       ))
+  ),
+  PivotItem(headerText = "Внешняя торговля",
+            info_card(text = tags$span("На графиках представлены показатели, характеризующие состояние внешней торговли рассматриваемым товаром.",
+                                       tags$br(),
+                                       "Для выбранного в календаре месяца отображаются три крупнейших направления экспорта и импорта.",
+                                       tags$br(),
+                                       "Показатель географической концентрации рассчитан как индекс Херфиндаля-Хиршмана на основе долей отдельных торговых партнеров в экспорте и импорте.
+                       Чем ближе значение индекса к 1, тем более концентрированным является российский экспорт/импорт товара.",
+                                       tags$br(),
+                                       "Индексы концентрации и доли в производстве расчитаны на сглаженных данных для исключения сезонного фактора."),
+                      toggle_id = NULL,
+                      download_id = "download_yearly"),
+            tags$div(
+            tags$div(plotlyOutput('plot_trade'), style='flex-basis: 70%;'),
+            tags$div(calendar_temp('date_trade_country', date_first=as.Date('2014-02-01'), date_last=as.Date('2022-01-01'))),
+            style="display:flex; flex-wrap:nowrap;justify-content: space-around;"
+            )
+  ))
+
+pivot_market <- Pivot(
+  PivotItem(headerText="Месячные данные",
+            pivot_market_monthly),
+  PivotItem(headerText="Квартальные данные",
+            "In development"),
+  PivotItem(headerText="Годовые данные",
+            "In development")
 )
-)
+
 market_page <- makePage(
   title = "Анализ предложения на рынке",
   subtitle = "По данным Росстата и ФТС",
   contents = div(
-    tags$br(),
-    tags$div(
-      tags$div("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
-Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта.",
-               style="flex-basis: 70%;"),
-      tags$div(
-        tags$div(Toggle.shinyInput("sa_toggle",value = TRUE,
-                                   label = "",
-                                   onText = "Сезонное сглаживание включено",
-                                   offText = "Сезонное сглаживание отключено"
-        )),
-        tags$div(CommandBar(
-          items = list(
-            CommandBarItem("Скачать", "Download", id="download_yearly", onClick=JS("function() { window.location.href = $('#download_yearly_shadow').attr('href'); }"))
-          ))),
-        style='display:flex; flex-wrap:nowrap; flex-direction:column;justify-content: space-around;align-items:center;'),
-      style="display:flex; flex-wrap:nowrap;justify-content: space-around;", class="text-card ms-depth-8"),
-#     
-#     tags$span(
-#       tags$table(tags$tr(
-#         tags$td("На данном графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с аналогичным периодом предыдущего года. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.
-# Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта."
-#                 , width='80%'),
-#         
-#         tags$td(,span(
-#           
-#           
-#         ),style="display:block;"), width='20%', align='center')
-#       )),
-#       class="ms-depth-8 text-card"),
-    # MessageBar("В данном разделе представлен анализ совокупного предложения рассматриваемого товара на рынке. Ресурсы, доступные для потребления,
-    #            рассчитываются как сумма внутреннего производства и импортных поставок за вычетом экспорта и изменения запасов."
-    #            , messageBarType='0', isMultiline=FALSE, truncated=TRUE),
-    # span(downloadLink("download_str", "Скачать данные в .xlsx"), style='visibility:hidden; overflow:hidden;'),
-    # shinycssloaders::withSpinner(plotlyOutput('supply_analysis'), type = 6),
-    tags$table(width="100%",
-               
-               
-               tags$tr(
-                 tags$td(pivot_graphs, width="80%"),
-                 tags$td(datepicker, width="20%", valign='bottom', align='center', style='padding-bottom:10%;')
-               )),
+    pivot_market,
     style='height:1300px;')
   )
 
@@ -408,9 +460,9 @@ market_page <- makePage(
 #---------------------------------------------------------------------------------------------------
 router <- make_router(
   route("/", home_page),
+  route('market', market_page),
   route("cons", cons_page),
-  route("prod", prod_page),
-  route('market', market_page)
+  route("prod", prod_page)
 )
 ui <- fluentPage(
   lay(router$ui),
@@ -469,8 +521,6 @@ server <- function(input, output, session) {
       $('#choice_markets').css('display', 'none');
       $('#choice_models').css('display', 'block');
                           "))
-      # Disabling download button
-      # shinyjs::runjs("$('#download').css('display', 'none')") 
       # Highlighting the page in the menu
       script <- ''
       for (i in c('cons', 'prod', 'market')) {
@@ -480,8 +530,6 @@ server <- function(input, output, session) {
       shinyjs::runjs(script) 
       shinyjs::runjs(paste("$('[href=", '"', "#!/", '"', "]').removeClass('unchosen_page').addClass('chosen_page')", sep = ""))
     } else {
-      # Enabling download button
-      # shinyjs::runjs("$('#download').css('display', 'block')") 
       # Highlighting pages in the menu
       if (is_page('cons')) {
         shinyjs::runjs(HTML("
@@ -495,8 +543,6 @@ server <- function(input, output, session) {
         }
         shinyjs::runjs(script) 
         shinyjs::runjs(paste("$('[href=", '"', "#!/cons", '"', "]').addClass('chosen_page')", sep = "")) 
-        # shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_yearly_shadow').attr('href');});") 
-
       }
       if (is_page('prod')) {
         shinyjs::runjs(HTML("
@@ -510,8 +556,7 @@ server <- function(input, output, session) {
         }
         shinyjs::runjs(script) 
         shinyjs::runjs(paste("$('[href=", '"', "#!/prod", '"', "]').addClass('chosen_page')", sep = "")) 
-        # shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_yearly').attr('href');});") 
-        
+
       }
       if (is_page('market')) {
         shinyjs::runjs(HTML("
@@ -525,8 +570,7 @@ server <- function(input, output, session) {
         }
         shinyjs::runjs(script) 
         shinyjs::runjs(paste("$('[href=", '"', "#!/market", '"', "]').addClass('chosen_page')", sep = "")) 
-        # shinyjs::runjs("$('#download').click(function(){ window.location.href = $('#download_str').attr('href');});") 
-      }
+        }
     }
   })
 
@@ -560,7 +604,7 @@ server <- function(input, output, session) {
                               window.highlight = function() {', innerhtml, '}', sep='')))
   })
   # Ensure the chosen model is constantly highlighted
-  shinyjs::runjs('setInterval( function(){ highlight(); highlight2(); tips()}, 1)') 
+  shinyjs::runjs(paste0('setInterval( function(){ highlight(); highlight2(); tips();}, 1);'))
   # Create information panels
   isPanelOpen <- reactiveVal(FALSE)
   output$reactPanel <- renderReact({
@@ -768,22 +812,26 @@ server <- function(input, output, session) {
   output$supply_analysis_non_sa <- renderPlotly({
     stack_supply(market(), sa = FALSE)
   }) 
-  # observe({
-  #   data_map <- market()$df_FD
-  #   data_map$date
-  #   dates_map <- unique(data_map$date)
-  #   dates_map
-  #   pars <- paste("minDate = '", first(dates_map), "', maxDate = '", last(dates_map), "'", sep='')
-  #   # updateAirDateInput(session, "date_map", value = last(dates_map), options=pars)
-  # })
-  output$map_sa <- renderPlotly({
-    plot_map(market(), level='reg', sa=input$sa_toggle, date_choice=req(input$date_map))
+  output$map_volume <- renderPlotly({
+    plot_map(data=market(), level_fed=input$map_volume_toggle, date_choice=input$date_map_volume, dynam = FALSE)
   })
-  output$supply_map <- renderPlotly({
-    production_map(market(), rus_map, sa=input$sa_toggle, date_choice=req(input$date_map))
+  output$map_dynam <- renderPlotly({
+    plot_map(data=market(), level_fed=input$map_dynam_toggle, date_choice=input$date_map_dynam, dynam = TRUE)
   })
-  output$supply_map_non_sa <- renderPlotly({
-    production_map(market(), rus_map, date_choice=req(input$date_map), sa=FALSE)
+  output$plot_trade <- renderPlotly({
+    plot_trade(data=market(), date_choice=input$date_trade_country)
+  })
+  output$trade_prices <- renderPlotly({
+     trade_prices(market(), convert=input$usd_toggle)
+  })
+  output$prod_prices <- renderPlotly({
+    prod_prices(market())
+  })
+  output$prod_prices_categ <- renderUI({
+    tags$div(
+    tags$div("До 2016 года включительно отображены данные в категориях ОКПД:", paste(market()$prod_price_names[["2010"]], collapse=',')),
+    tags$div("С 2017 года отображены данные в категориях ОКПД2:", paste(market()$prod_price_names[["2017"]], collapse=','))
+    )
   })
   output$impacts <- renderTable({
     estimated <- model()
