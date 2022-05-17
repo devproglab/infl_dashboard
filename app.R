@@ -407,8 +407,8 @@ pivot_market_monthly <- Pivot(
                                        tags$br(),
                                        tags$sub("*Региональные данные не всегда полны ввиду необходимости обеспечения конфиденциальности первичной статистической информации.")),
                       toggle_id = "map_dynam_toggle",
-                      toggleOn = "Данные по субъектам федерации",
-                      toggleOff = "Данные по федеральным округам",
+                      toggleOn = "Данные по федеральным округам",
+                      toggleOff = "Данные по субъектам федерации",
                       download_id = "download_yearly"),
             tags$table(width="100%",
                        tags$tr(

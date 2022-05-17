@@ -564,7 +564,6 @@ plot_map <- function(level_fed, data, date_choice, dynam) {
 
 
 plot_trade <- function(data, date_choice) {
-  ed <- data$ed
   df <- data$trade_concentr %>%
     pivot_longer(-date) %>% filter(!name %in% c('HHI_im', 'HHI_ex')) %>% 
     mutate(name = case_when(
@@ -613,27 +612,45 @@ plot_trade <- function(data, date_choice) {
   df <- data$trade_country %>% filter(date == date_choice) %>% mutate(NAPR = case_when(
     NAPR=='ИМ' ~ 'Импорт',
     NAPR=='ЭК' ~ 'Экспорт'))
-  p3 <- df %>%
-    arrange(NAPR, rev(STRANA), value) %>%
-    group_by(NAPR) %>%
-    mutate(label_y = cumsum(value) - 0.5*value) %>%
-    ggplot(aes(x=NAPR, y = value, fill = STRANA)) +
-    geom_col(stat_count="identity", aes(text=paste0(NAPR,
-                             ' в ',
-                             STRANA,
-                             ', ',
-                             as.yearmon(date),
-                             ': ',
-                             format(round(value), big.mark=" "),
-                             ' ',
-                             ed
-                             ))) +
-    geom_text(aes(y = label_y, label = ifelse(STRANA=='Прочие', "", STRANA)),  colour = "white") +
-    # facet_wrap(NAPR~., scale='free_y') + 
+  ed <- tolower(data$trade_price$EDIZM[1])
+  bars <- map(unique(df$NAPR)
+                    , ~geom_bar(stat = "identity", position = "stack", data = df %>% filter(NAPR == .x)))
+  labels <- geom_text(aes(y = label_y, label = NAME), colour = "white", 
+                      data = df %>% group_by(NAPR) %>%
+                        arrange(NAPR, desc(value)) %>%
+                        mutate(label_y = cumsum(value) - 0.5*value))
+  p3 <- df %>% 
+    ggplot(aes(x = NAPR, y = value, fill = reorder(NAME, value), text=paste0(NAPR,' в ',NAME,', ',as.yearmon(date),': ',
+                                                                                 format(round(value), big.mark=" "), ' ', ed))) + 
+    bars +
+    labels +
+    guides(fill=guide_legend("ordering")) +
     xlab('') +
     ylab(ed) +
     scale_y_continuous(labels = function(x) format(x, big.mark = " ")) +
     theme(legend.position="none")
+  p3
+  # p3 <- df %>%
+  #   arrange(NAPR, rev(NAME)) %>%
+  #   group_by(NAPR) %>%
+  #   mutate(label_y = cumsum(value) - 0.5*value) %>%
+  #   ggplot(aes(x=NAPR, y = value, fill = NAME)) +
+  #   geom_col(stat_count="identity", aes(text=paste0(NAPR,
+  #                            ' в ',
+  #                            NAME,
+  #                            ', ',
+  #                            as.yearmon(date),
+  #                            ': ',
+  #                            format(round(value), big.mark=" "),
+  #                            ' ',
+  #                            ed
+  #                            ))) +
+  #   geom_text(aes(y = label_y, label = NAME),  colour = "white") +
+  #   # facet_wrap(NAPR~., scale='free_y') + 
+  #   xlab('') +
+  #   ylab(ed) +
+  #   scale_y_continuous(labels = function(x) format(x, big.mark = " ")) +
+  #   theme(legend.position="none")
   p3 <- ggplotly(p3, height=900, tooltip='text') %>%
     config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)") 
   idx <- which(unlist(lapply(p3$x$data, function(x) !is.null(x$hoveron))))
