@@ -1,7 +1,6 @@
 #---------------------------------------------------------------------------------------------------
 # Load libraries, functions & dependencies
 #---------------------------------------------------------------------------------------------------
-# Sys.setlocale(category = "LC_ALL", locale = "C")
 options(encoding = "UTF-8")
 source('plots.R')
 shiny::addResourcePath("shiny.router", system.file("www", package = "shiny.router"))
@@ -65,11 +64,8 @@ for (i in 2:length(markets)) {
   options[[i]] <- elem
 }
 
-market_models_corresp <- read_xlsx('data_output/correspondence.xlsx')
+rus_map <- readRDS('data_output/federal_districts.rds')
 
-# rus_map <- readRDS('data_output/federal_districts.rds')
-date_last <- as.Date('2022-02-01')
-date_last_trade <- as.Date('2022-01-01')
 #---------------------------------------------------------------------------------------------------
 # Define helper functions
 #---------------------------------------------------------------------------------------------------
@@ -147,43 +143,24 @@ lay <- function(mainUI) {
   )
 }
 
-info_card <- function(text, toggle_id = NULL, toggleOn = NULL, toggleOff = NULL, download_id = NULL, panel = FALSE,
-                      dropdown = NULL) {
-  d <- c()
-  if (!is.null(toggle_id)) {
-    for (i in 1:length(toggle_id)) {
-      d[[i]] <- tags$div(Toggle.shinyInput(toggle_id[i], value = TRUE,
-                                           label = "",
-                                           onText = toggleOn[i],
-                                           offText = toggleOff[i] 
-      ))
-    }
-  }
-  if (!is.null(dropdown)) {
-    if (is.null(toggle_id)) {
-      k <- 1
-    } else {
-      k <- length(toggle_id) + 1
-    }
-    options <- list(
-      list(key = "m", text = "Месячные данные"),
-      list(key = "q", text = "Квартальные данные"),
-      list(key = "y", text = "Годовые данные")
-    )
-    d[[k]] <- Dropdown.shinyInput(dropdown, value = "m", options = options)
-  }
-
+info_card <- function(text, toggle_id = NULL, toggleOn = NULL, toggleOff = NULL, download_id = NULL, panel = FALSE) {
   tags$div(
     tags$div(text,
-             style="flex-basis: 70%; display: flex;align-items: center;"),
+             style="flex-basis: 70%;"),
     tags$div(
-      d,
-      tags$div(
+      if (!is.null(toggle_id)) {
+        tags$div(Toggle.shinyInput(toggle_id, value = TRUE,
+                                   label = "",
+                                   onText = toggleOn,
+                                   offText = toggleOff 
+        ))
+      },
+    tags$div(
         if (!panel) {
-          CommandBar(
-            items = list(
-              CommandBarItem("Скачать", "Download", id=download_id, onClick=JS(paste0("function() { window.location.href = $('#", download_id, '_shadow', "').attr('href'); }")))
-            ))
+        CommandBar(
+        items = list(
+           CommandBarItem("Скачать", "Download", id=download_id, onClick=JS(paste0("function() { window.location.href = $('#", download_id, '_shadow', "').attr('href'); }")))
+        ))
         } else {
           CommandBar(
             items = list(
@@ -191,7 +168,7 @@ info_card <- function(text, toggle_id = NULL, toggleOn = NULL, toggleOff = NULL,
               CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
             ))
         }
-      ),
+        ),
       style='display:flex; flex-wrap:nowrap; flex-direction:column;justify-content: space-around; align-items:center;'),
     style="display:flex; flex-wrap:nowrap;justify-content: space-between; margin-top:15px;", class="text-card ms-depth-8")
 }
@@ -227,7 +204,7 @@ calendar_temp <- function(id, date_first, date_last) {
                                                 }
                                                 "),
                       # formatDate=JS("(date) => {return !date ? '' : (date.getMonth() + 1) + '/' + (date.getFullYear()) }"),
-                      maxDate=JS(paste("new Date('", year(date_last), "-", ifelse(nchar(month(date_last))==1, paste0(0, month(date_last)), month(date_last)),  "-01')", sep='')),
+                      maxDate=JS(paste("new Date('", year(date_last), "-", ifelse(nchar(month(date_last))==1, paste0(0, month(date_last)), month(date_last)),  "-31')", sep='')),
                       minDate=JS(paste0("new Date('", as.character(date_first), "')")),
                       value=JS(paste("new Date('", year(date_last), "-", ifelse(nchar(month(date_last))==1, paste0(0, month(date_last)), month(date_last)),  "-01')", sep='')))
 }
@@ -239,8 +216,8 @@ calendar_temp <- function(id, date_first, date_last) {
 # Header bar with logo and buttons
 header <- tagList(
   div(class = 'logo-block',
-      Link(href = '/', img(src = "hse-logo.png", class = "logo")),
-      div(Link(href = '/', Text(variant = "xLarge", "Анализ потребительских рынков"), class = 'title-link'), class = "title")
+  Link(href = '/', img(src = "hse-logo.png", class = "logo")),
+  div(Link(href = '/', Text(variant = "xLarge", "Анализ потребительских рынков"), class = 'title-link'), class = "title")
   )
 )
 # Sidebar navigation & product choice
@@ -254,8 +231,8 @@ navigation <- tagList (
         icon = 'Home'
       ),
       list(
-        name = 'Анализ рыночной конъюнктуры',
-        url = '#!/market ',
+        name = 'Анализ предложения на рынке',
+        url = '#!/market',
         key = 'market',
         icon = 'PieDouble'
       ),
@@ -299,27 +276,24 @@ footer <- Stack(
     horizontal = TRUE,
     horizontalAlign = 'end',
     Link(href = 'https://disk.yandex.ru/i/-K1zML1CoFWjRA', target='_blank',
-         Text(
-           variant = "medium",
-           nowrap = FALSE,
-           "Методологическая справка",
-           style = 'padding: 0px 14px 0px 14px'
-         )),
+      Text(
+      variant = "medium",
+      nowrap = FALSE,
+      "Методологическая справка",
+      style = 'padding: 0px 14px 0px 14px'
+    )),
     Link(href = 'https://disk.yandex.ru/i/uX5WL4YZDniOqQ', target='_blank',
-         Text(
-           variant = "medium",
-           nowrap = FALSE,
-           "Презентация",
-           style = "border-left: 1px solid darkgray; padding: 0px 14px 0px 14px"
-         )),
+      Text(
+      variant = "medium",
+      nowrap = FALSE,
+      "Презентация",
+      style = "border-left: 1px solid darkgray; padding: 0px 14px 0px 14px"
+    )),
     reactOutput("reactPanel")
   )
 )
 # Load value boxes
-cards_cpi <- htmlOutput('card_set_CPI')
-cards_ppi <- htmlOutput('card_set_PPI')
-cards_market <- htmlOutput('card_set_market')
-
+cards <- htmlOutput('card_set')
 # Home page
 home_page <- makePage(title = 'Факторный анализ потребительских цен',
                       subtitle = "Общие сведения",
@@ -339,7 +313,7 @@ pivot_consumer <- Pivot(
               tags$div(tableOutput('impacts')),
               style="display:flex; flex-wrap:nowrap;justify-content: space-around;"
             )
-  ),
+            ),
   PivotItem(headerText = "Изменение цен - к предыдущему периоду", 
             info_card(text = tags$span("На графике жирной линией обозначено, как изменилась цена выбранного товара по сравнению с предыдущим месяцем/неделей. Это изменение раскладывается на влияние отдельных факторов, релевантных для данного рынка. Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.",
                                        tags$br(),
@@ -349,20 +323,20 @@ pivot_consumer <- Pivot(
                       download_id = "download_monthly",
                       panel = TRUE),
             plotlyOutput('price_mom')
-  ),
+            ),
   PivotItem(headerText = "Структура розничной цены", 
             info_card(text = tags$span("На графике представлена динамика средней цены выбранного товара в разбивке по основным статьям структуры розничной цены (согласно ежегодным данным Росстата)."),
                       download_id = "download_struct",
                       pane = TRUE),
             plotlyOutput('price_structure')
-  )
+            )
 )
 # Consumer prices page
 cons_page <- makePage(
   title = "Динамика потребительских цен",
-  subtitle = "По данным Росстата",
+  subtitle = "",
   contents = div(
-    div(class = "cards", cards_cpi),
+    div(class = "cards", cards),
     span(downloadLink("download_yearly_shadow", "Скачать данные в .xlsx"),
          downloadLink("download_mom_shadow", "Скачать данные в .xlsx"),
          downloadLink("download_str_shadow", "Скачать данные в .xlsx"),
@@ -380,6 +354,7 @@ pivot_prodprices <- Pivot(
                       # toggleOn = "Сезонное сглаживание включено",
                       # toggleOff = "Сезонное сглаживание отключено",
                       download_id = "download_yearly"),
+            htmlOutput('prod_prices_categ'),
             plotlyOutput('prod_prices')),
   PivotItem(headerText = 'Внешнеторговые цены',
             info_card(text = tags$span("На графике изображены средние цены импорта и экспорта товаров, входящих в рассматриваемые товарные группы. Они получены как частное общей стоимости проданной продукции и ее количества в натуральном выражении.",
@@ -394,39 +369,35 @@ prod_page <- makePage(
   title = "Динамика цен производителей, импорта и экспорта",
   subtitle = "По данным Росстата и ФТС",
   contents = div(
-    div(class = "cards", cards_ppi),
     pivot_prodprices,
     style='height:600px;'
   )
 )
 
-# Market analysis page: monthly
+# Market analysis page
 pivot_market_monthly <- Pivot(
   PivotItem(headerText = "Динамика совокупного предложения", 
             info_card(text = tags$span("На графике представлена динамика расчетного объема совокупного предложения на рынке. Предложение складывается из внутреннего производства, изменения запасов и сальдо чистого экспорта.",
-                                       tags$br(), "Все расчёты производится в натуральном выражении. По умолчанию используются сезонно-сглаженные данные. Для отображения исходных значений необходимо воспользоваться переключателем справа."),
-                      toggle_id = "sa_toggle_m",
+                            tags$br(), "Все расчёты производится в натуральном выражении. По умолчанию используются сезонно-сглаженные данные. Для отображения исходных значений необходимо воспользоваться переключателем справа."),
+                      toggle_id = "sa_toggle",
                       toggleOn = "Сезонное сглаживание включено",
                       toggleOff = "Сезонное сглаживание отключено",
-                      download_id = "download_yearly",
-                      dropdown = 'type_supply'),
+                      download_id = "download_yearly"),
             plotlyOutput('supply_analysis')
-  ),
+            ),
   PivotItem(headerText = "Географическая структура производства",
             info_card(text = tags$span("Карта отражает географическое распределение внутреннего производства товара в России. Выбор анализируемого периода производится с помощью календаря справа от карты. По умолчанию данные представлены на уровне федеральных округов. 
                        Для отображения данных на уровне отдельных субъектов РФ необходимо воспользоваться переключателем", tags$sup("*"),
-                                       tags$br(), tags$sub("*Региональные данные не всегда полны ввиду необходимости обеспечения конфиденциальности первичной статистической информации.")),
+                      tags$br(), tags$sub("*Региональные данные не всегда полны ввиду необходимости обеспечения конфиденциальности первичной статистической информации.")),
                       toggle_id = "map_volume_toggle",
                       toggleOn = "Данные по федеральным округам",
                       toggleOff = "Данные по субъектам федерации",
-                      download_id = "download_yearly",
-                      dropdown = 'type_volume_map'),
+                      download_id = "download_yearly"),
             tags$table(width="100%",
                        tags$tr(
                          tags$td(plotlyOutput('map_volume'), width="80%"),
                          tags$td(
-                           htmlOutput('chosen_period_volume'),
-                           calendar_temp('date_map_volume', date_first=as.Date('2011-01-01'), date_last=date_last),
+                           calendar_temp('date_map_volume', date_first=as.Date('2011-01-01'), date_last=as.Date('2022-01-01')),
                            width="20%", valign='bottom', align='center', style='padding-bottom:10%;')
                        ))
   ),
@@ -438,14 +409,12 @@ pivot_market_monthly <- Pivot(
                       toggle_id = "map_dynam_toggle",
                       toggleOn = "Данные по федеральным округам",
                       toggleOff = "Данные по субъектам федерации",
-                      download_id = "download_yearly",
-                      dropdown = 'type_dyn_map'),
+                      download_id = "download_yearly"),
             tags$table(width="100%",
                        tags$tr(
                          tags$td(plotlyOutput('map_dynam'), width="80%"),
                          tags$td(
-                           htmlOutput('chosen_period_dynam'),
-                           calendar_temp('date_map_dynam', date_first=as.Date('2012-01-01'), date_last=date_last),
+                           calendar_temp('date_map_dynam', date_first=as.Date('2012-01-01'), date_last=as.Date('2022-01-01')),
                            width="20%", valign='bottom', align='center', style='padding-bottom:10%;')
                        ))
   ),
@@ -461,47 +430,28 @@ pivot_market_monthly <- Pivot(
                       toggle_id = NULL,
                       download_id = "download_yearly"),
             tags$div(
-              tags$div(plotlyOutput('plot_trade'), style='flex-basis: 70%;'),
-              tags$div(calendar_temp('date_trade_country', date_first=as.Date('2014-02-01'), date_last=date_last_trade)),
-              style="display:flex; flex-wrap:nowrap;justify-content: space-around;"
+            tags$div(plotlyOutput('plot_trade'), style='flex-basis: 70%;'),
+            tags$div(calendar_temp('date_trade_country', date_first=as.Date('2014-02-01'), date_last=as.Date('2022-01-01'))),
+            style="display:flex; flex-wrap:nowrap;justify-content: space-around;"
             )
-  ),
-  PivotItem(headerText = 'Розничные продажи',
-            info_card(text = tags$span("На графике изображен совокупный объем розничных продаж в выбранной товарной группе."),
-                      toggle_id = "retail_sa",
-                      toggleOn = "Сезонное сглаживание включено",
-                      toggleOff = "Сезонное сглаживание отключено",
-                      download_id = "download_yearly"),
-            htmlOutput('retail_categ'),
-            plotlyOutput('retail')
-            ),
-  PivotItem(headerText = 'Уровень наценки',
-            info_card(text = tags$span("На графике изображены средние уровни фактически сложившейся торговой наценки в сфере оптовой и розничной торговли товарами выбранной группы."),
-                      toggle_id = NULL,
-                      download_id = "download_yearly"),
-            htmlOutput('margin_categ'),
-            plotlyOutput('margin')
-  )
-  )
-
+  ))
 
 pivot_market <- Pivot(
   PivotItem(headerText="Месячные данные",
             pivot_market_monthly),
   PivotItem(headerText="Квартальные данные",
-            "2"),
+            "In development"),
   PivotItem(headerText="Годовые данные",
-            "3")
+            "In development")
 )
 
 market_page <- makePage(
-  title = "Анализ рыночной конъюнктуры",
+  title = "Анализ предложения на рынке",
   subtitle = "По данным Росстата и ФТС",
   contents = div(
-    div(class = "cards", cards_market),
-    pivot_market_monthly,
+    pivot_market,
     style='height:1300px;')
-)
+  )
 
 
 
@@ -531,28 +481,24 @@ ui <- fluentPage(
 # Define server-side dynamic functions
 #---------------------------------------------------------------------------------------------------
 server <- function(input, output, session) {
-  date_to_lab <- function(date) {
-    paste(day(as.Date(date)), ' ', labelset[month(as.Date(date))], '-', substr(year(as.Date(date)), 3, 4), sep =
-            '')
-  }
   router$server(input, output, session)
   # JS workarounds
   output$sidebar_choice <- renderUI({
-    tags$span(
       tags$span(
+        tags$span(
         GroupedList(
-          items = prods_list,
-          groups = groups_nav,
-          selectionMode = 0,
-          onShouldVirtualize = FALSE,
-          onRenderCell = JS("(depth, item) => (
+        items = prods_list,
+        groups = groups_nav,
+        selectionMode = 0,
+        onShouldVirtualize = FALSE,
+        onRenderCell = JS("(depth, item) => (
         jsmodule['react'].createElement('div', { className : 'model_choice', style: { paddingLeft: 20 }, label: item, onClick : () => {Shiny.setInputValue('prod_select', item) } }, item)
       )")),
-        div(
-          textInput('prod_select', label = NULL, value = models[1]),
-          style = 'display:none'
-        ), id='choice_models', style='display:block;'
-      ),
+      div(
+        textInput('prod_select', label = NULL, value = models[1]),
+        style = 'display:none'
+      ), id='choice_models', style='display:block;'
+    ),
       tags$span(GroupedList(
         items = prods_list_supply,
         groups = groups_nav_supply,
@@ -593,7 +539,7 @@ server <- function(input, output, session) {
         script <- ''
         for (i in c('', 'prod', 'market')) {
           script <- paste(script, 
-                          paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
+                      paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
         shinyjs::runjs(script) 
         shinyjs::runjs(paste("$('[href=", '"', "#!/cons", '"', "]').addClass('chosen_page')", sep = "")) 
@@ -610,7 +556,7 @@ server <- function(input, output, session) {
         }
         shinyjs::runjs(script) 
         shinyjs::runjs(paste("$('[href=", '"', "#!/prod", '"', "]').addClass('chosen_page')", sep = "")) 
-        
+
       }
       if (is_page('market')) {
         shinyjs::runjs(HTML("
@@ -624,15 +570,14 @@ server <- function(input, output, session) {
         }
         shinyjs::runjs(script) 
         shinyjs::runjs(paste("$('[href=", '"', "#!/market", '"', "]').addClass('chosen_page')", sep = "")) 
-      }
+        }
     }
   })
+
   # Load the model for a product
   model <- reactive({
     req(input$prod_select)
     model_name = input$prod_select
-    
-    
     model <- loadR(model_name)
     return(model)
   })
@@ -672,9 +617,8 @@ server <- function(input, output, session) {
   })
   observeEvent(input$showPanel, isPanelOpen(TRUE))
   observeEvent(input$hidePanel, isPanelOpen(FALSE))
-  
   # Create value boxes
-  output$card_set_CPI <- renderUI({
+  output$card_set <- renderUI({
     # Load model data
     estimated <- model()
     weight = estimated$weight
@@ -684,7 +628,7 @@ server <- function(input, output, session) {
     price = round(last(estimated$df[[1]]), 2)
     
     if (weekly) {
-      # Sum up 4 latest data points for a weekly model + get forecast
+    # Sum up 4 latest data points for a weekly model + get forecast
       length <- nrow(estimated$dfmod_unsmoothed)
       period_change = sum(estimated$dfmod_unsmoothed[(length - n.ahead + 1 - 4):(length - n.ahead), 1])
       if (!n.ahead==0) {
@@ -693,7 +637,7 @@ server <- function(input, output, session) {
         forecast_period=NULL
       }
     } else {
-      # Get the latest data point for a monthly model 
+    # Get the latest data point for a monthly model 
       period_change = nth(estimated$dfmod_unsmoothed[, 1],-(n.ahead + 1))
       if (!n.ahead==0) {
         forecast_period = round(estimated$forecast[2] * 100, 2)
@@ -820,7 +764,7 @@ server <- function(input, output, session) {
             sep = ''
           ),
           tooltip2 = paste(label_fcast_yoy, ' / ', label_next_yoy, sep =
-                             ''),
+                  ''),
           size = 10,
           card_type = ifelse(yoy_change > 0, "bad", "good"),
           icon = ifelse(yoy_change > 0, "fa-arrow-up", "fa-arrow-down")
@@ -845,316 +789,48 @@ server <- function(input, output, session) {
       )
     )
   })
-  # value boxes for producer prices
-  output$card_set_PPI <- renderUI({
-    # Load model data
-    data <- market()
-    model_name <- data$category
-    ed <- last(unique(data$prod_price$OKEI))
-    ed <- case_when(
-      ed=='Тысяча штук' ~ 'тыс. шт.',
-      ed=='литр' ~ 'л.'
-    )
-    rub <- '\U20BD'
-    price = round(last(data$prod_price$value), 2)
-    # Get date of the latest data point for PPI and create a label
-    label_current <- date_to_lab(last(data$prod_price$date))
-    prod_price_names <- data$prod_price_names
-    # trade prices
-    label_current_trade <-date_to_lab(last(data$trade_price$date))
-    price_ex <- round(last(data$trade_price[data$trade_price$NAPR=='ЭК',]$mean_price_rub))
-    price_im <- round(last(data$trade_price[data$trade_price$NAPR=='ИМ',]$mean_price_rub))
-    
-    # producer inflation
-    label_prev <- date_to_lab(nth(data$prod_price$date, -2))
-    label_yoy <- date_to_lab(nth(data$prod_price$date, -13))
-    ppi_prev <- round((last(data$prod_price$value) / nth(data$prod_price$value, -2) - 1) * 100, 2)
-    ppi_yoy <- round((last(data$prod_price$value) / nth(data$prod_price$value, -13) -1 ) * 100, 2)
-    
-    # Stack 3 cards together
-    Stack(
-      div(model_name, style = 'margin-bottom:10px;', class = 'ms-fontSize-20 ms-fontWeight-regular'),
-      Stack(
-        horizontal = TRUE,
-        horizontalAlign = 'space-between',
-        tokens = list(childrenGap = 10),
-        # current producer price card
-        makeCard(
-          title = paste(
-            price,
-            ' ',
-            rub,
-            '/',
-            ed,
-            sep = ''
-          ),
-          content2 = span(Text(paste('Цены производителей, ', label_current, sep = ''), variant = 'mediumPlus'),
-                          tags$sup(TooltipHost(
-                            content = span(paste0('До 2017 года по ОКПД: "', prod_price_names[[1]], '"'), tags$br(), paste0('После 2017 года по ОКПД2: "', prod_price_names[[2]], '"')),
-                            delay = 0,
-                            Text(FontIcon(iconName = 'info'))
-                          ))),
-          size = 10,
-          card_type = 'neutral',
-          icon = 'fa-coins'
-        ),
-        # y-o-y card
-        makeCard(
-          title = paste(
-            ifelse(ppi_yoy > 0, '+', ''),
-            ppi_yoy,
-            '%',
-            sep = ''
-          ),
-          tooltip = paste(label_current, '/', label_yoy),
-          content = Text('Инфляция цен производителей, г/г:', variant = 'mediumPlus'),
-          content2 = Text('Инфляция цен производителей, м/м:', variant = 'mediumPlus'),
-          title2 = paste(
-            ifelse(ppi_prev > 0, '+', ''),
-            ppi_prev,
-            '%',
-            sep = ''
-          ),
-          tooltip2 = paste(label_current, ' / ', label_prev, sep =
-                             ''),
-          size = 10,
-          card_type = ifelse(ppi_yoy > 0, "bad", "good"),
-          icon = ifelse(ppi_yoy > 0, "fa-arrow-up", "fa-arrow-down")
-        ),
-        # export-import price
-        makeCard(
-          content = Text(paste0('Цены экспортеров, ',label_current_trade,':'), variant = 'mediumPlus'),
-          content2 = Text(paste0('Цены импортеров, ',label_current_trade,':'), variant = 'mediumPlus'),
-          title = paste(
-            price_ex,
-            ' ',
-            rub,
-            '/',
-            ed,
-            sep = ''
-          ),
-          title2 = paste(
-            price_im,
-            ' ',
-            rub,
-            '/',
-            ed,
-            sep = ''
-          ),
-          size = 10,
-          card_type = 'neutral',
-          icon = 'fa-coins'
-        )
-      )
-    )
-  })
-  # value boxes for market analysis
-  output$card_set_market <- renderUI({
-    # Load model data
-    data <- market()
-    model_name <- data$category
-    ed <- data$ed
-    rub <- '\U20BD'
-    
-    # supply volumes
-    supply_month <- format(round(last(data$df_sa$total)), big.mark = " ")
-    
-    
-    # Get date of the latest supply point
-    label_current <- date_to_lab(last(data$df_sa$date))
-    prod_price_names <- data$prod_price_names
-    
-    # internal production
-    production_dyn_prev <- round(
-      (last(data$df_sa[data$df_sa$type=='Внутреннее производство',]$value) / nth(data$df_sa[data$df_sa$type=='Внутреннее производство',]$value, -2) - 1) * 100, 2
-      )
-    production_dyn_yoy <- round((last(data$df_sa[data$df_sa$type=='Внутреннее производство',]$value) / nth(data$df_sa[data$df_sa$type=='Внутреннее производство',]$value, -13) - 1) * 100, 2)
-    label_prev <- date_to_lab(nth(data$df_sa[data$df_sa$type=='Внутреннее производство',]$date,-2))
-    label_yoy <- date_to_lab(nth(data$df_sa[data$df_sa$type=='Внутреннее производство',]$date, -13))
-    
-    # retail sales
-    if (!is.null(data$df_retail_sa)) {
-      no_retail <- FALSE
-      retail_q <- format(round(last(data$df_retail_sa$value)), big.mark = " ")
-      retail_q_yoy <- format(round((last(data$df_retail_sa$value) / nth(data$df_retail_sa$value, -5) - 1)*100, 2), big.mark = " ")
-      
-      label_retail <- date_to_lab(last(data$df_retail_sa$date))
-      label_retail_yoy <- date_to_lab(nth(data$df_retail_sa$date, -5))
-    } else {
-      no_retail <- TRUE
-      # retail_q <- NA
-      # retail_q_yoy <- NA
-      # label_retail <- NA
-      # label_retail_yoy <- NA
-    }
-    if (!no_retail) {
-      retail_card <- makeCard(
-        content = Text(paste0('Объем розничных продаж, ', label_retail, ':'), variant = 'mediumPlus'),
-        content2 = Text(paste0('Темп роста розничных продаж, г/г',':'), variant = 'mediumPlus'),
-        title = paste(
-          retail_q,
-          ' ',
-          rub,
-          sep = ''
-        ),
-        title2 = paste0(retail_q_yoy, '%'),
-        size = 10,
-        card_type = ifelse(retail_q_yoy < 0, "bad", "good"),
-        icon = ifelse(retail_q_yoy > 0, "fa-arrow-up", "fa-arrow-down")
-      )
-    } else {
-      retail_card <- makeCard(
-        content = Text(paste0('Объем розничных продаж,', ':'), variant = 'mediumPlus'),
-        title = '',
-        content2 = 'Нет данных',
-        size = 10,
-        card_type = 'neutral',
-        icon = "fa-empty-set"
-      )
-    }
-    
-    
-    
-    
-    # Stack 3 cards together
-    Stack(
-      div(model_name, style = 'margin-bottom:10px;', class = 'ms-fontSize-20 ms-fontWeight-regular'),
-      Stack(
-        horizontal = TRUE,
-        horizontalAlign = 'space-between',
-        tokens = list(childrenGap = 10),
-        # current producer price card
-        makeCard(
-          title = paste(
-            supply_month,
-            ed,
-            sep = ' '
-          ),
-          content2 = span(Text(paste('Совокупное предложение, ', label_current, sep = ''), variant = 'mediumPlus'),
-                          tags$sup(TooltipHost(
-                            content = span('До 2017 года по ОКПД: ', paste(data$OKPD, collapse='; '), tags$br(), 'После 2017 года по ОКПД2: ', paste(data$OKPD2, collapse='; ')),
-                            delay = 0,
-                            Text(FontIcon(iconName = 'info'))
-                          ))),
-          size = 10,
-          card_type = 'neutral',
-          icon = 'fa-coins'
-        ),
-        # y-o-y card
-        makeCard(
-          title = paste(
-            ifelse(production_dyn_yoy > 0, '+', ''),
-            production_dyn_yoy,
-            '%',
-            sep = ''
-          ),
-          tooltip = paste(label_current, '/', label_yoy),
-          content = Text('Динамика внутреннего производства, г/г:', variant = 'mediumPlus'),
-          content2 = Text('Динамика внутреннего производства, м/м:', variant = 'mediumPlus'),
-          title2 = paste(
-            ifelse(production_dyn_prev > 0, '+', ''),
-            production_dyn_prev,
-            '%',
-            sep = ''
-          ),
-          tooltip2 = paste(label_current, ' / ', label_prev, sep =
-                             ''),
-          size = 10,
-          card_type = ifelse(production_dyn_yoy < 0, "bad", "good"),
-          icon = ifelse(production_dyn_yoy > 0, "fa-arrow-up", "fa-arrow-down")
-        ),
-        retail_card
-        # makeCard(
-        #   content = Text(paste0('Объем розничных продаж, ', ifelse(!no_retail, label_retail, NULL), ':'), variant = 'mediumPlus'),
-        #   content2 = ifelse(!no_retail, Text(paste0('Темп роста розничных продаж, г/г',':'), variant = 'mediumPlus'), NULL),
-        #   title = ifelse(!no_retail, paste(
-        #     retail_q,
-        #     ' ',
-        #     rub,
-        #     sep = ''
-        #   ), 'нет данных'),
-        #   title2 = ifelse(!no_retail, paste0(retail_q_yoy, '%'), NULL),
-        #   size = 10,
-        #   card_type = ifelse(!no_retail, ifelse(retail_q_yoy < 0, "bad", "good"), 'neutral'),
-        #   icon = ifelse(!no_retail, ifelse(retail_q_yoy > 0, "fa-arrow-up", "fa-arrow-down"), "fa-empty-set")
-        # )
-      )
-    )
-  })
   # Plot y-o-y inflation graph when on respective page
   output$price_yoy <- renderPlotly({
-    plotdecomp(model(), yoy = 1)
+      plotdecomp(model(), yoy = 1)
   })
   # Plot w-o-w / m-o-m inflation graph when on respective page
   output$price_mom <- renderPlotly({
-    plotdecomp(model(), yoy = 0)
+      plotdecomp(model(), yoy = 0)
   })
   # Plot price structure graph when on respective page if data exists
   output$price_structure <- renderPlotly({
-    validate(need(
-      !is.null(model()$price_decomp),
-      "Данные по структуре розничной цены данного товара недоступны"
-    ))
-    try(plot_price_decomp(model()))
+      validate(need(
+        !is.null(model()$price_decomp),
+        "Данные по структуре розничной цены данного товара недоступны"
+      ))
+      try(plot_price_decomp(model()))
   })
   # Plot supply structure on respective page
   output$supply_analysis <- renderPlotly({
-    stack_supply(market(), sa = input$sa_toggle_m, type=input$type_supply)
+    stack_supply(market(), sa = input$sa_toggle)
   })
+  output$supply_analysis_non_sa <- renderPlotly({
+    stack_supply(market(), sa = FALSE)
+  }) 
   output$map_volume <- renderPlotly({
-    plot_map(data=market(), level_fed=input$map_volume_toggle, date_choice=input$date_map_volume, dynam = FALSE, type=input$type_volume_map)
+    plot_map(data=market(), level_fed=input$map_volume_toggle, date_choice=input$date_map_volume, dynam = FALSE)
   })
   output$map_dynam <- renderPlotly({
-    plot_map(data=market(), level_fed=input$map_dynam_toggle, date_choice=input$date_map_dynam, dynam = TRUE, type=input$type_dyn_map)
+    plot_map(data=market(), level_fed=input$map_dynam_toggle, date_choice=input$date_map_dynam, dynam = TRUE)
   })
-
   output$plot_trade <- renderPlotly({
     plot_trade(data=market(), date_choice=input$date_trade_country)
   })
   output$trade_prices <- renderPlotly({
-    trade_prices(market(), convert=input$usd_toggle)
+     trade_prices(market(), convert=input$usd_toggle)
   })
   output$prod_prices <- renderPlotly({
     prod_prices(market())
   })
-
-  output$retail <- renderPlotly({
-    validate(need(
-      !nrow(market()$df_retail)==0,
-      "Данные по розничным продажам данного товара недоступны"
-    ))
-    try(retail_trade(data=market(), sa=input$retail_sa))
-    
-  })
-  output$retail_categ <- renderUI({
-    if (!length(market()$retail_names[["2010"]])==0) {
-      tags$div(
-        tags$div("До 2016 года включительно отображены данные в категориях ОКПД:", paste(market()$retail_names[["2010"]], collapse=',')),
-        tags$div("С 2017 года отображены данные в категориях ОКПД2:", paste(market()$retail_names[["2017"]], collapse=','))
-      )      
-    }
-  })
-  output$margin <- renderPlotly({
-    margin_plot(data=market())
-  })
-  output$margin_categ <- renderUI({
+  output$prod_prices_categ <- renderUI({
     tags$div(
-      tags$div("Для оптовой торговли отображены данные в категории: ", paste(market()$margin_whole, collapse=',')),
-      tags$div("Для розничной торговли отображены данные в категории: ", paste(market()$margin_retail, collapse=','))
-    )
-  })
-  output$chosen_period_volume <- renderUI({
-    tags$div("Отображаются данные за: ",
-             if (input$type_volume_map=='m') as.yearmon(input$date_map_volume),
-             if (input$type_volume_map=='q') paste0(quarter(input$date_map_volume), 'К', year(input$date_map_volume)),
-             if (input$type_volume_map=='y') paste0(year(input$date_map_volume), ' год')
-    )
-  })
-  output$chosen_period_dynam <- renderUI({
-    tags$div("Отображаются данные за: ",
-             if (input$type_dyn_map=='m') as.yearmon(input$date_map_dynam),
-             if (input$type_dyn_map=='q') paste0(quarter(input$date_map_dynam), 'К', year(input$date_map_dynam)),
-             if (input$type_dyn_map=='y') paste0(year(input$date_map_dynam), ' год')
+    tags$div("До 2016 года включительно отображены данные в категориях ОКПД:", paste(market()$prod_price_names[["2010"]], collapse=',')),
+    tags$div("С 2017 года отображены данные в категориях ОКПД2:", paste(market()$prod_price_names[["2017"]], collapse=','))
     )
   })
   output$impacts <- renderTable({
@@ -1171,7 +847,7 @@ server <- function(input, output, session) {
     final[,2] <- paste(final[,2], '%', sep='')
     final[,3] <- paste(final[,3], ' руб.', sep='')
     final
-  }, align='lcc')
+    }, align='lcc')
   # Generate y-o-y downloadable .xlsx
   output$download_yearly_shadow <- downloadHandler(
     filename = function() {

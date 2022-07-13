@@ -3,18 +3,18 @@ options(encoding = "UTF-8")
 using <- function(...) {
   libs <- unlist(list(...))
   req <- unlist(lapply(libs,require,character.only=TRUE))
-  # need <- libs[req==FALSE]
-  # if (length(need)>0) {
-  #   install.packages(need)
-  #   lapply(need,require,character.only=TRUE)
-  # }
+  need <- libs[req==FALSE]
+  if (length(need)>0) {
+    install.packages(need)
+    lapply(need,require,character.only=TRUE)
+  }
 }
 
 using('data.table', 'readxl', 'dplyr', 'xts', 'plotly', 'stats', 'writexl',
       'lubridate', 'ggplot2', 'shiny', 'scales', 'flexdashboard', 'RColorBrewer', 'clock',
       'downloadthis', 'glue', 'leaflet', 'sass', 'shiny', 'shiny.fluent', 'shiny.react', 'shiny.router',
       'shinycssloaders', 'shinyjs', 'stringr', 'tmap', 'sf', 'shinyWidgets', 'geofacet', 'purrr', 'reshape2', 'tidyr', 'forcats',
-      'htmltools')
+      'htmltools', 'tsibble')
 
 theme_set(theme_minimal())
 options(scipen=999)
@@ -347,21 +347,43 @@ loadR <- function(fileName, where='./data_output/models/'){
 #'
 #' @return Produces an interactive graph showing the dynamics of total supply on the market  
 #' @export
-stack_supply <- function(data, sa = TRUE, save=FALSE) {
+stack_supply <- function(data, sa = TRUE, save=FALSE, type='m') {
   df <- data$df
   df_sa <- data$df_sa
   ed <- data$ed
-  colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
-  # colors <- brewer.pal(n = 9, name = 'Set3')
   if (sa) {
-    p <- ggplot(df_sa)
+    df <- df_sa
   } else {
-    p <- ggplot(df)
+    df <- df
   }
+  # conversion to necessary frequency
+  if (type=='q') {
+    df <- df %>%
+      as_tsibble(index = date, key=type) %>% 
+      index_by(yq = ~ yearquarter(.)) %>% 
+      as_tibble() %>%
+      group_by(type, yq) %>%
+      summarise(value = sum(value, na.rm=TRUE)) %>%
+      group_by(yq) %>%
+      mutate(total = sum(value, na.rm=TRUE), yq=as.Date(yq)) %>%
+      rename("date"="yq")
+  } else if (type=='y') {
+    df <- df %>%
+      as_tsibble(index = date, key=type) %>% 
+      index_by(yq = ~ year(.)) %>% 
+      as_tibble() %>%
+      group_by(type, yq) %>%
+      summarise(value = sum(value, na.rm=TRUE)) %>%
+      group_by(yq) %>%
+      mutate(total = sum(value, na.rm=TRUE), yq=as.Date(paste0(yq,'-01-01'))) %>%
+      rename("date"="yq")  
+    }
+  colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
+  p <- ggplot(df)
   p <- p +
-    geom_bar(aes(fill=type, y=value, x=date, text=paste(type, ', ', format(date, format='%b %y'), ': ', round(value,2), ' ', ed, sep='')), stat="identity") +
+    geom_bar(aes(fill=type, y=value, x=date, text=paste(type, ', ', format(date, format='%b %y'), ': ', format(round(value,2), big.mark=" "), ' ', ed, sep='')), stat="identity") +
     geom_line(aes(y=total, x=date, color=ifelse(sa, 'Итого, сез. сглаж.', 'Итого'), 
-                  text=paste(ifelse(sa, 'Совокупное предложение (сез. сглаж.), ', 'Совокупное предложение, '), format(date, '%b %y'), ': ', round(total, 2), ' ', ed, sep=''),
+                  text=paste(ifelse(sa, 'Совокупное предложение (сез. сглаж.), ', 'Совокупное предложение, '), format(date, '%b %y'), ': ', format(round(total,2), big.mark=" "), ' ', ed, sep=''),
                   group=1),
               size=1.2) +
     xlab('') +
@@ -442,19 +464,49 @@ production_map <- function(data, rus_map, date_choice, sa = TRUE) {
     config(locale = 'ru')
   t
 }
-plot_map <- function(level_fed, data, date_choice, dynam) {
+plot_map <- function(level_fed, data, date_choice, dynam, type='m') {
   ed <- data$ed
+  if (!level_fed) df <- data$df_reg %>% mutate(value = ifelse(value==0, NA, value)) else df <- data$df_FD %>% mutate(value = ifelse(value==0, NA, value))
   if (length(date_choice)==0) {
     date_choice = last(df$date)
   }
   date_choice=floor_date(as.Date(date_choice), unit='months')
+  # conversion to necessary frequency
+  if (type=='q') {
+    laglen <- 4
+    date_choice=floor_date(as.Date(date_choice), unit='quarter')
+    df <- df %>%
+      as_tsibble(index = date, key=OKATO) %>% 
+      index_by(yq = ~ yearquarter(.)) %>% 
+      as_tibble() %>%
+      group_by(OKATO, yq) %>%
+      summarise(value = sum(value, na.rm=TRUE), across()) %>%
+      select(-date) %>%
+      rename("date"="yq") %>%
+      distinct() %>%
+      mutate(date=as.Date(date))
+  } else if (type=='y') {
+    laglen <- 1
+    date_choice=floor_date(as.Date(date_choice), unit='year')
+    df <- df %>%
+      as_tsibble(index = date, key=OKATO) %>% 
+      index_by(yq = ~ year(.)) %>% 
+      as_tibble() %>%
+      group_by(OKATO, yq) %>%
+      summarise(value = sum(value, na.rm=TRUE), across()) %>%
+      select(-date) %>%
+      rename("date"="yq") %>%
+      distinct() %>%
+      mutate(date=as.Date(paste0(date,'-01-01')))
+  } else {
+    laglen <- 12
+  }
   if (!level_fed) {
     grid <- read.table('data_output/rus_grid_reg2.csv', header=TRUE, sep=',') %>%
       mutate(code = ifelse(nchar(code)==10, paste0('0', code), code)) %>%
       select(-code_FD, -FD) %>% rename("name" = "name_short")
-    df <- data$df_reg %>% mutate(value = ifelse(value==0, NA, value))
     if (dynam) {
-      data_date <- df %>% group_by(OKATO_id) %>% mutate(value = (value/lag(value, 12) - 1)*100 ) %>%
+      data_date <- df %>% group_by(OKATO_id) %>% mutate(value = (value/lag(value, laglen) - 1)*100 ) %>%
         filter(date == date_choice) %>%
         right_join(grid, by=c("OKATO_id" = "code")) %>% select(-row, -col) %>% rename("code" = "OKATO_id")
     } else {
@@ -467,9 +519,8 @@ plot_map <- function(level_fed, data, date_choice, dynam) {
     grid <- read.table('data_output/rus_grid_reg2.csv', header=TRUE, sep=',') %>%
       mutate(code = ifelse(nchar(code)==10, paste0('0', code), code)) %>%
       mutate(code_FD = ifelse(nchar(code_FD)==2, paste0('0', code_FD), code_FD))
-    df <- data$df_FD %>% mutate(value = ifelse(value==0, NA, value))
     if (dynam) {
-      data_date <- df %>% group_by(OKATO_id) %>% mutate(value = (value/lag(value, 12) - 1)*100 ) %>%
+      data_date <- df %>% group_by(OKATO_id) %>% mutate(value = (value/lag(value, laglen) - 1)*100 ) %>%
         filter(date == date_choice) %>%
         right_join(grid, by=c("OKATO_id" = "code_FD")) %>% select(-row, -col)
     } else {
@@ -499,10 +550,9 @@ plot_map <- function(level_fed, data, date_choice, dynam) {
           plot.margin = margin(-2, "points"),
           panel.spacing = unit(-2, "points")
           )
-
   if (dynam) {
     p <- p + scale_fill_gradientn(name='Темпы роста, % г/г',
-                                  colours=c("#e83131", "#ffbfbf", "white", "#c3ffbf","#3AE831"),
+                                  colours=c("#e83131", "#ffbfbf", "dark gray", "#c3ffbf","#3AE831"),
                                   na.value="#D0D0D0",
                                   oob=oob_squish,
                                   # trans="pseudo_log",
@@ -703,11 +753,10 @@ trade_prices <- function(data, convert) {
   ed <- tolower(df$EDIZM[1])
   p <- df %>% mutate(NAPR = case_when(NAPR=='ЭК' ~ "Экспорт", NAPR=='ИМ' ~ 'Импорт')) 
   if (convert) {
-    p <- p %>% ggplot(aes(x=date, y=mean_price_rub))
-  } else {
-    p <- p %>% ggplot(aes(x=date, y=mean_price))
+    p <- p %>% select(-mean_price) %>% rename("mean_price"="mean_price_rub")
   }
-    p <- p + geom_line(aes(col=NAPR, text=paste0('Средняя цена',
+  p <- p %>% ggplot(aes(x=date, y=mean_price)) +
+      geom_line(aes(col=NAPR, text=paste0('Средняя цена',
                                                          ifelse(NAPR=="Экспорт", ' экспорта', ' импорта'),
                                                          ', ',
                                                          as.yearmon(date),
@@ -742,3 +791,66 @@ prod_prices <- function(data) {
     config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
   p
 }
+retail_trade <- function(data, sa=TRUE) {
+  if (sa) {
+    df <- data$df_retail_sa
+  } else {
+    df <- data$df_retail
+  }
+  df <- data$df_retail_FD
+  # 
+  # p <- df %>% ggplot() + geom_line(aes(x=date, y=value, col='blue', text=paste0('Розничные продажи',
+  #                                                                               ', ',
+  #                                                                               as.yearmon(date),
+  #                                                                               ': ',
+  #                                                                               format(round(value, 2), big.mark=" "), 
+  #                                                                               'руб.'),
+  #                                      group=1)) +
+  #   xlab('') +
+  #   scale_y_continuous(labels = function(x) format(x, big.mark=" ")) +
+  #   ylab('руб.') +
+  #   theme(legend.position='none')
+  # t <- ggplotly(p, tooltip='text') %>%
+  #   config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
+  # t
+  colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
+  p <- ggplot(df) +
+    geom_bar(aes(fill=OKATO, y=value, x=date, text=paste0('Продажи, ', OKATO, ', ', as.yearmon(date), ':', format(value, big.mark=" "), ' руб.')), stat="identity") +
+    geom_line(aes(y=total, x=date, color='Итого', text=paste0('Продажи, всего, ', as.yearmon(date), ': ', format(total, big.mark=" "), ' руб.'),
+                  group=1),
+              size=1.2) +
+    xlab('') +
+    scale_fill_manual(values = colors, name='') +
+    scale_x_date(breaks='6 months', labels = scales::label_date("%b-%y"), expand=expansion(add = 10)) +
+    scale_color_manual(values = c("Итого" = "#008272"), name='') +
+    theme(legend.position="bottom")
+  t <- ggplotly(p, tooltip='text') %>%
+    config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)") %>%
+    layout(legend = list(orientation = "h", x = 0, y = -0.1))
+  for (i in 1:length(t$x$data)) {
+    t$x$data[[i]]$name <- str_sub(str_replace_all(t$x$data[[i]]$name, regex('[//(//)0-9]*'), ''), 1, -2)
+  }
+  t
+} 
+margin_plot <- function(data) {
+  df <- data$margin
+  df$type <- case_when(
+    str_detect(df$name,'розн') ~ 'Розничная торговля',
+    str_detect(df$name,'оптов') ~ 'Оптовая торговля',
+  )
+  p <- df %>% ggplot() + geom_line(aes(x=date, y=value, col=type, text=paste0('Уровень наценки',
+                                                                                ', ',
+                                                                                as.yearmon(date),
+                                                                                ': ',
+                                                                                format(round(value, 2), big.mark=" "), 
+                                                                                '%'),
+                                       group=type)) +
+    scale_color_discrete(name='') +
+    xlab('') +
+    ylab('%') +
+    theme(legend.position='bottom')
+  p <- ggplotly(p, tooltip='text') %>%
+    config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)") %>%
+    layout(legend = list(orientation = "h", x = 0.3, y = -0.1))
+  p 
+} 
