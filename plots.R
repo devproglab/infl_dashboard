@@ -800,21 +800,6 @@ retail_trade <- function(data, sa=TRUE) {
   df <- data$df_retail_FD %>%
     group_by(date) %>%
     mutate(total = sum(value, na.rm=TRUE))
-  # 
-  # p <- df %>% ggplot() + geom_line(aes(x=date, y=value, col='blue', text=paste0('Розничные продажи',
-  #                                                                               ', ',
-  #                                                                               as.yearmon(date),
-  #                                                                               ': ',
-  #                                                                               format(round(value, 2), big.mark=" "), 
-  #                                                                               'руб.'),
-  #                                      group=1)) +
-  #   xlab('') +
-  #   scale_y_continuous(labels = function(x) format(x, big.mark=" ")) +
-  #   ylab('руб.') +
-  #   theme(legend.position='none')
-  # t <- ggplotly(p, tooltip='text') %>%
-  #   config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
-  # t
   colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
   p <- ggplot(df) +
     geom_bar(aes(fill=OKATO, y=value, x=date, text=paste0('Продажи, ', OKATO, ', ', as.yearmon(date), ':', format(value, big.mark=" "), ' руб.')), stat="identity") +

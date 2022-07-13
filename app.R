@@ -8,7 +8,6 @@ shiny::addResourcePath("shiny.router", system.file("www", package = "shiny.route
 shiny_router_js_src <- file.path("shiny.router", "shiny.router.js")
 shiny_router_script_tag <-
   shiny::tags$script(type = "text/javascript", src = shiny_router_js_src)
-
 #---------------------------------------------------------------------------------------------------
 # Technical preparations
 #---------------------------------------------------------------------------------------------------
@@ -631,7 +630,6 @@ server <- function(input, output, session) {
   model <- reactive({
     req(input$prod_select)
     model_name = input$prod_select
-    
     
     model <- loadR(model_name)
     return(model)
