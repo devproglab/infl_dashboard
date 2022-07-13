@@ -797,7 +797,10 @@ retail_trade <- function(data, sa=TRUE) {
   } else {
     df <- data$df_retail
   }
-  df <- data$df_retail_FD
+  df <- data$df_retail_FD %>%
+    group_by(date) %>%
+    mutate(total = sum(value, na.rm=TRUE))
+    
   # 
   # p <- df %>% ggplot() + geom_line(aes(x=date, y=value, col='blue', text=paste0('Розничные продажи',
   #                                                                               ', ',
