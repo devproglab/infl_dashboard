@@ -793,11 +793,11 @@ prod_prices <- function(data) {
 }
 retail_trade <- function(data, sa=TRUE) {
   if (sa) {
-    df <- data$df_retail_sa
+    df <- data$df_retail_FD_sa
   } else {
-    df <- data$df_retail
+    df <- data$df_retail_FD
   }
-  df <- data$df_retail_FD %>%
+  df <- df %>%
     group_by(date) %>%
     mutate(total = sum(value, na.rm=TRUE))
   colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
@@ -841,3 +841,136 @@ margin_plot <- function(data) {
     layout(legend = list(orientation = "h", x = 0.3, y = -0.1))
   p 
 } 
+counterfeit_plot <- function(data) {
+  df <- data$counterfeit %>%
+    drop_na() 
+  value <- last(df %>%
+                  pull(counterfeit_smooth))
+  date <- last(df %>%
+                 pull(date))
+  cntft_plot <- plot_ly(
+    domain = list(x = c(0, 0.45), y = c(0.6, 0.85)),
+    value = value,
+    # title = list(text = paste0('Доля нелегального оборота\n',as.yearqtr(date)), font=list(size=14, family='Segoe UI', color='#323130')),
+    type = "indicator",
+    mode = "gauge+number",
+    gauge = list(
+      axis = list(range = list(NULL, 100), ticks='outside', ticklen=5, tickcolor='#323130', tickfont=list(size=14, family='Segoe UI', color='#323130'), ticksuffix='%'),
+      bar = list(color='#e83131'),
+      borderwidth = 0,
+      bordercolor = '#0078D4',
+      threshold = list(line = list(color='#0078D4'), thickness=15, value = value)
+    ),
+    number = list(
+      suffix='%',
+      prefix='     ',
+      font = list(size=18, family='Segoe UI', color='#323130')
+    )
+  ) 
+  cntft_dyn <- df %>%
+    ggplot() +
+    geom_line(aes(x=date, y=counterfeit, group=1, text=NULL), alpha=0.15) + 
+    geom_line(aes(x=date, y=counterfeit_smooth, group=2, text=paste0('Доля нелегального оборота',
+                                                                         ', ',
+                                                                         as.yearmon(date),
+                                                                         ': ',
+                                                                         format(round(counterfeit_smooth, 1), big.mark=" "), 
+                                                                         '%')), alpha=1, col="#0078D4", size=1 ) +
+    theme(legend.position='bottom') +
+    xlab('') +
+    ylab('%')
+  cntft_dyn <- ggplotly(cntft_dyn, tooltip='text') 
+  annotations = list( 
+    list( 
+      x = 0.5,  
+      y = 0.9,  
+      text = paste0('Доля нелегального оборота, ',as.yearqtr(date)),  
+      xref = "paper",  
+      yref = "paper",  
+      xanchor = "center",  
+      yanchor = "bottom",  
+      showarrow = FALSE 
+    ),  
+    list( 
+      x = 0.5,  
+      y = 0.45,  
+      text = "Динамика доли нелегального оборота",  
+      xref = "paper",  
+      yref = "paper",  
+      xanchor = "center",  
+      yanchor = "bottom",  
+      showarrow = FALSE 
+    )
+  )
+  
+  deltas <- data$meanImpact
+  vals <- round(c(deltas$d_tax_implied, deltas$d_prod, deltas$d_fot, -deltas$d_prod*0.2)/10^9,1)
+  df <- data.frame(
+    desc=c('Налоги', 'Выручка', 'ФОТ', 'Издержки', 'Итого'),
+    value=c(vals, sum(vals))
+  )
+  df$desc <- factor(df$desc, levels = df$desc)
+  df$id <- seq_along(df$value)
+  df$type <- ifelse(df$value > 0, "in","out")
+  df[df$desc %in% c("Итого"), "type"] <- "net"
+  df$end <- cumsum(df$value)
+  df$end <- c(head(df$end, -1), 0)
+  df$start <- c(0, head(df$end, -1))
+  df <- df[, c(3, 1, 4, 6, 5, 2)]
+  
+  balance <- ggplot(df) +
+    geom_rect(aes(x = desc, fill = type, xmin = id - 0.45, xmax = id + 0.45, ymin = end, ymax = start, text=
+                    paste0(desc, ': ', value, ' млрд руб.')
+                  )) +
+    ylab('млрд руб.') +
+    xlab(NULL) +
+    scale_fill_manual(values=c("in"="#B0E3AB", "out"="#F9AAB0", "net"='#C7E0F4')) +
+    theme(legend.position = 'none')
+  balance <- ggplotly(balance, tooltip='text') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                          autosize = T, dragmode=FALSE,  
+                                                          xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  # balance
+
+  empl_fig <- plot_ly(
+    domain = list(x = c(0.5, 0.75), y = c(0.85, 1)),
+    type = "indicator",
+    mode = "delta",
+    gauge = list(shape = "bullet"),
+    delta = list(reference = 0, font = list(size=18, family='Segoe UI', color='#323130')),
+    value = round(deltas$d_empl),
+    title = list(text = "Занятость", font = list(size=18, family='Segoe UI', color='#323130')),
+    # height = 150
+    )
+  capacity_fig <- plot_ly(
+    domain = list(x = c(0.75, 1), y = c(0.85, 1)),
+    type = "indicator",
+    mode = "delta",
+    gauge = list(shape = "bullet"),
+    delta = list(reference = 1, relative=TRUE, font = list(size=18, family='Segoe UI', color='#323130')),
+    value = 1 + round(deltas$d_cap_implied,2)/100,
+    title= list(text = "Загрузка мощностей", font = list(size=18, family='Segoe UI', color='#323130')),
+    # height = 150
+    )
+  # capacity_fig
+  
+  combo <- subplot(cntft_plot, cntft_dyn, nrows  = 2, margin = 0.1) %>%
+    config(displayModeBar = F, locale = 'ru') %>% layout(annotations = annotations, plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                         autosize = T, dragmode=FALSE,  
+                                                         xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  # combo
+  combo2 <- subplot(empl_fig, capacity_fig, nrows=2) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                                     autosize = T, dragmode=FALSE,  
+                                                                     xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  # combo2
+  
+  combo3 <- subplot(combo2, balance, nrows=2, which_layout=2, heights=c(0.2,0.8)) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                                                             autosize = T, dragmode=FALSE,  
+                                                                                             xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  # combo3
+  
+  combo_final <- subplot(combo, combo3, nrows=1, widths=c(0.5,0.5), margin=0.05) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                                                             autosize = T, dragmode=FALSE,  
+                                                                                             xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  combo_final %>% config(displayModeBar = F)
+}
+# colours=c("#e83131", "#ffbfbf", "dark gray", "#c3ffbf","#3AE831"),

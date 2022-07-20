@@ -253,22 +253,28 @@ navigation <- tagList (
         icon = 'Home'
       ),
       list(
+        name = 'Потребительские цены',
+        url = '#!/cons',
+        key = 'cons',
+        icon = 'LineChart'
+      ),
+      list(
+        name = 'Цены производителей, импорта и экспорта',
+        url = '#!/prod',
+        key = 'prod',
+        icon = 'StackedLineChart'
+      ),
+      list(
         name = 'Анализ рыночной конъюнктуры',
         url = '#!/market ',
         key = 'market',
         icon = 'PieDouble'
       ),
       list(
-        name = 'Цены производителей, импорта и экспорта',
-        url = '#!/prod',
-        key = 'prod',
-        icon = 'CalculatorPercentage'
-      ),
-      list(
-        name = 'Потребительские цены',
-        url = '#!/cons',
-        key = 'cons',
-        icon = 'CalculatorPercentage'
+        name = 'Анализ нелегального оборота',
+        url = '#!/counterfeit',
+        key = 'counterfeit',
+        icon = 'Compare'
       )
     ))),
     initialSelectedKey = 'home',
@@ -399,8 +405,8 @@ prod_page <- makePage(
   )
 )
 
-# Market analysis page: monthly
-pivot_market_monthly <- Pivot(
+# Market analysis page
+pivot_market <- Pivot(
   PivotItem(headerText = "Динамика совокупного предложения", 
             info_card(text = tags$span("На графике представлена динамика расчетного объема совокупного предложения на рынке. Предложение складывается из внутреннего производства, изменения запасов и сальдо чистого экспорта.",
                                        tags$br(), "Все расчёты производится в натуральном выражении. По умолчанию используются сезонно-сглаженные данные. Для отображения исходных значений необходимо воспользоваться переключателем справа."),
@@ -481,29 +487,32 @@ pivot_market_monthly <- Pivot(
             htmlOutput('margin_categ'),
             plotlyOutput('margin')
   )
-  )
-
-
-pivot_market <- Pivot(
-  PivotItem(headerText="Месячные данные",
-            pivot_market_monthly),
-  PivotItem(headerText="Квартальные данные",
-            "2"),
-  PivotItem(headerText="Годовые данные",
-            "3")
 )
+
 
 market_page <- makePage(
   title = "Анализ рыночной конъюнктуры",
   subtitle = "По данным Росстата и ФТС",
   contents = div(
     div(class = "cards", cards_market),
-    pivot_market_monthly,
+    pivot_market,
     style='height:1300px;')
 )
-
-
-
+# counterfeit analysis
+cntf_page <- makePage(
+  title = "Анализ нелегального оборота",
+  subtitle = "Расчеты НИУ ВШЭ",
+  contents = div(
+    # div(class = "cards", cards_ppi),
+    info_card(text = tags$span("На информационной панели слева представлены результаты оценки доли нелегального оборота продукции на квартальном уровне. 
+                                Из-за волатильности квартальных данных итоговый показатель сглаживается (синяя линия).
+                                В правой части представлены оценки затрат и выгод (в годовом выражении), реализовавшихся после введения в отрасли обязательной цифровой маркировки. "),
+              toggle_id = NULL,
+              download_id = NULL),
+    plotlyOutput('counterfeit_plot'),
+    style='height:1300px;'
+  )
+)
 #---------------------------------------------------------------------------------------------------
 # Define unique URLs for pages & setup the UI
 #---------------------------------------------------------------------------------------------------
@@ -511,7 +520,8 @@ router <- make_router(
   route("/", home_page),
   route('market', market_page),
   route("cons", cons_page),
-  route("prod", prod_page)
+  route("prod", prod_page),
+  route("counterfeit", cntf_page)
 )
 ui <- fluentPage(
   lay(router$ui),
@@ -1095,6 +1105,14 @@ server <- function(input, output, session) {
     ))
     try(plot_price_decomp(model()))
   })
+  output$counterfeit_plot <- renderPlotly({
+    validate(need(
+      !is.na(market()$counterfeit),
+      "Данные по доле нелегального розничного оборота недоступны"
+    ))
+    try(counterfeit_plot(market()))
+  })
+  counterfeit_plot
   # Plot supply structure on respective page
   output$supply_analysis <- renderPlotly({
     stack_supply(market(), sa = input$sa_toggle_m, type=input$type_supply)
