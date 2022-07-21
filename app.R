@@ -146,7 +146,7 @@ lay <- function(mainUI) {
   )
 }
 
-info_card <- function(text, toggle_id = NULL, toggleOn = NULL, toggleOff = NULL, download_id = NULL, panel = FALSE,
+info_card <- function(text, toggle_id = NULL, toggleOn = NULL, toggleOff = NULL, download_id = NULL, panel = FALSE, display_download=TRUE,
                       dropdown = NULL) {
   d <- c()
   if (!is.null(toggle_id)) {
@@ -179,16 +179,26 @@ info_card <- function(text, toggle_id = NULL, toggleOn = NULL, toggleOff = NULL,
       d,
       tags$div(
         if (!panel) {
-          CommandBar(
-            items = list(
-              CommandBarItem("Скачать", "Download", id=download_id, onClick=JS(paste0("function() { window.location.href = $('#", download_id, '_shadow', "').attr('href'); }")))
-            ))
+          if (display_download) {
+            CommandBar(
+              items = list(
+                CommandBarItem("Скачать", "Download", id=download_id, onClick=JS(paste0("function() { window.location.href = $('#", download_id, '_shadow', "').attr('href'); }")))
+              ))            
+          }
         } else {
-          CommandBar(
-            items = list(
-              CommandBarItem("Скачать", "Download", id=download_id, onClick=JS(paste0("function() { window.location.href = $('#", download_id, '_shadow', "').attr('href'); }"))),
-              CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
-            ))
+          if (display_download) {
+            CommandBar(
+              items = list(
+                CommandBarItem("Скачать", "Download", id=download_id, onClick=JS(paste0("function() { window.location.href = $('#", download_id, '_shadow', "').attr('href'); }"))),
+                CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
+              ))  
+          } else {
+            CommandBar(
+              items = list(
+                CommandBarItem("Пояснения к факторам", "Info", id="info_panel", onClick=JS("function() { Shiny.setInputValue('showPanel', Math.random()); }"))
+              ))              
+          }
+
         }
       ),
       style='display:flex; flex-wrap:nowrap; flex-direction:column;justify-content: space-around; align-items:center;'),
@@ -384,7 +394,7 @@ pivot_prodprices <- Pivot(
                       # toggle_id = "sa_toggle",
                       # toggleOn = "Сезонное сглаживание включено",
                       # toggleOff = "Сезонное сглаживание отключено",
-                      download_id = "download_yearly"),
+                      display_download=FALSE),
             plotlyOutput('prod_prices')),
   PivotItem(headerText = 'Внешнеторговые цены',
             info_card(text = tags$span("На графике изображены средние цены импорта и экспорта товаров, входящих в рассматриваемые товарные группы. Они получены как частное общей стоимости проданной продукции и ее количества в натуральном выражении.",
@@ -392,7 +402,7 @@ pivot_prodprices <- Pivot(
                       toggle_id = "usd_toggle",
                       toggleOn = "Конвертация цен в рубли включена",
                       toggleOff = "Конвертация цен в рубли отключена",
-                      download_id = "download_yearly"),
+                      display_download=FALSE),
             plotlyOutput('trade_prices'))
 )
 prod_page <- makePage(
@@ -413,7 +423,7 @@ pivot_market <- Pivot(
                       toggle_id = "sa_toggle_m",
                       toggleOn = "Сезонное сглаживание включено",
                       toggleOff = "Сезонное сглаживание отключено",
-                      download_id = "download_yearly",
+                      display_download=FALSE,
                       dropdown = 'type_supply'),
             plotlyOutput('supply_analysis')
   ),
@@ -424,7 +434,7 @@ pivot_market <- Pivot(
                       toggle_id = "map_volume_toggle",
                       toggleOn = "Данные по федеральным округам",
                       toggleOff = "Данные по субъектам федерации",
-                      download_id = "download_yearly",
+                      display_download=FALSE,
                       dropdown = 'type_volume_map'),
             tags$table(width="100%",
                        tags$tr(
@@ -443,7 +453,7 @@ pivot_market <- Pivot(
                       toggle_id = "map_dynam_toggle",
                       toggleOn = "Данные по федеральным округам",
                       toggleOff = "Данные по субъектам федерации",
-                      download_id = "download_yearly",
+                      display_download=FALSE,
                       dropdown = 'type_dyn_map'),
             tags$table(width="100%",
                        tags$tr(
@@ -464,7 +474,7 @@ pivot_market <- Pivot(
                                        tags$br(),
                                        "Индексы концентрации и доли в производстве расчитаны на сглаженных данных для исключения сезонного фактора."),
                       toggle_id = NULL,
-                      download_id = "download_yearly"),
+                      display_download=FALSE),
             tags$div(
               tags$div(plotlyOutput('plot_trade'), style='flex-basis: 70%;'),
               tags$div(calendar_temp('date_trade_country', date_first=as.Date('2014-02-01'), date_last=date_last_trade)),
@@ -476,14 +486,14 @@ pivot_market <- Pivot(
                       toggle_id = "retail_sa",
                       toggleOn = "Сезонное сглаживание включено",
                       toggleOff = "Сезонное сглаживание отключено",
-                      download_id = "download_yearly"),
+                      display_download=FALSE),
             htmlOutput('retail_categ'),
             plotlyOutput('retail')
             ),
   PivotItem(headerText = 'Уровень наценки',
             info_card(text = tags$span("На графике изображены средние уровни фактически сложившейся торговой наценки в сфере оптовой и розничной торговли товарами выбранной группы."),
                       toggle_id = NULL,
-                      download_id = "download_yearly"),
+                      display_download=FALSE),
             htmlOutput('margin_categ'),
             plotlyOutput('margin')
   )
@@ -508,7 +518,8 @@ cntf_page <- makePage(
                                 Из-за волатильности квартальных данных итоговый показатель сглаживается (синяя линия).
                                 В правой части представлены оценки затрат и выгод (в годовом выражении), реализовавшихся после введения в отрасли обязательной цифровой маркировки. "),
               toggle_id = NULL,
-              download_id = NULL),
+              download_id = NULL,
+              display_download=FALSE),
     plotlyOutput('counterfeit_plot'),
     style='height:1300px;'
   )
