@@ -972,7 +972,6 @@ counterfeit_plot <- function(data) {
                                                                                              autosize = T, dragmode=FALSE,  
                                                                                              xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
   # combo3
-  
   combo_final <- subplot(combo, combo3, nrows=1, widths=c(0.5,0.5), margin=0.05) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
                                                                                              autosize = T, dragmode=FALSE,  
                                                                                              xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
