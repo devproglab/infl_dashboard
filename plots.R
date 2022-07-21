@@ -904,7 +904,7 @@ counterfeit_plot <- function(data) {
   )
   
   deltas <- data$meanImpact
-  vals <- round(c(deltas$d_tax_implied, deltas$d_prod, deltas$d_fot, -deltas$d_prod*0.2)/10^9,1)
+  vals <- round(c(deltas$d_tax_implied, deltas$d_prod, deltas$d_fot, -deltas$marking_cost)/10^9,1)
   df <- data.frame(
     desc=c('Налоги', 'Выручка', 'ФОТ', 'Издержки', 'Итого'),
     value=c(vals, sum(vals))
@@ -919,18 +919,23 @@ counterfeit_plot <- function(data) {
   df <- df[, c(3, 1, 4, 6, 5, 2)]
   
   balance <- ggplot(df) +
-    geom_rect(aes(x = desc, fill = type, xmin = id - 0.45, xmax = id + 0.45, ymin = end, ymax = start, text=
+    geom_rect(aes(x = desc, fill = type, xmin = id - 0.4, xmax = id + 0.4, ymin = end, ymax = start, text=
                     paste0(desc, ': ', value, ' млрд руб.')
                   )) +
+    geom_segment(data = df[1:(nrow(df) -1),], aes(x = id + 0.4,
+                                                       xend = id + 0.6,
+                                                       y = end,
+                                                       yend = end), col='darkgray') +
+    geom_text(aes(x=desc, y=start+(end-start)/2, label=paste0(desc, '\n', value, ' млрд')), color="black", size=3) + 
     ylab('млрд руб.') +
     xlab(NULL) +
     scale_fill_manual(values=c("in"="#B0E3AB", "out"="#F9AAB0", "net"='#C7E0F4')) +
-    theme(legend.position = 'none')
+    theme(legend.position = 'none', axis.ticks.x=element_blank(), axis.text.x=element_blank())
   balance <- ggplotly(balance, tooltip='text') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
                                                           autosize = T, dragmode=FALSE,  
                                                           xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  balance$x$data[[7]]$hoverinfo <- "none"
   # balance
-
   empl_fig <- plot_ly(
     domain = list(x = c(0.5, 0.75), y = c(0.85, 1)),
     type = "indicator",
