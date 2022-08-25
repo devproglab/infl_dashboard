@@ -256,15 +256,15 @@ header <- tagList(
 navigation <- tagList (
   Nav(
     groups = list(list(links = list(
-      list(
-        name = 'Общие сведения',
-        url = '#!/',
-        key = 'home',
-        icon = 'Home'
-      ),
+      # list(
+      #   name = 'Общие сведения',
+      #   url = '#!/',
+      #   key = 'home',
+      #   icon = 'Home'
+      # ),
       list(
         name = 'Потребительские цены',
-        url = '#!/cons',
+        url = '#!/',
         key = 'cons',
         icon = 'LineChart'
       ),
@@ -284,10 +284,16 @@ navigation <- tagList (
         name = 'Анализ нелегального оборота',
         url = '#!/counterfeit',
         key = 'counterfeit',
+        icon = 'BlockedSite'
+      ),
+      list(
+        name = 'Анализ затрат и выгод ОЦМ',
+        url = '#!/balance',
+        key = 'balance',
         icon = 'Compare'
       )
     ))),
-    initialSelectedKey = 'home',
+    initialSelectedKey = 'cons',
     styles = list(
       root = list(
         height = '100%',
@@ -416,7 +422,7 @@ prod_page <- makePage(
 )
 
 # Market analysis page
-pivot_market <- Pivot(
+pivot_market <- Pivot(overflowBehavior="menu",
   PivotItem(headerText = "Динамика совокупного предложения", 
             info_card(text = tags$span("На графике представлена динамика расчетного объема совокупного предложения на рынке. Предложение складывается из внутреннего производства, изменения запасов и сальдо чистого экспорта.",
                                        tags$br(), "Все расчёты производится в натуральном выражении. По умолчанию используются сезонно-сглаженные данные. Для отображения исходных значений необходимо воспользоваться переключателем справа."),
@@ -513,10 +519,8 @@ cntf_page <- makePage(
   title = "Анализ нелегального оборота",
   subtitle = "Расчеты НИУ ВШЭ",
   contents = div(
-    # div(class = "cards", cards_ppi),
-    info_card(text = tags$span("На информационной панели слева представлены результаты оценки доли нелегального оборота продукции на квартальном уровне. 
-                                Из-за волатильности квартальных данных итоговый показатель сглаживается (синяя линия).
-                                В правой части представлены оценки затрат и выгод (в годовом выражении), реализовавшихся после введения в отрасли обязательной цифровой маркировки. "),
+    info_card(text = tags$span("На информационной панели представлены результаты оценки доли нелегального оборота продукции на квартальном уровне. Расчет производится с помощью
+                                балансового метода, предполагающего сопоставление легального предложения и объема розничных продаж."),
               toggle_id = NULL,
               download_id = NULL,
               display_download=FALSE),
@@ -524,15 +528,39 @@ cntf_page <- makePage(
     style='height:1300px;'
   )
 )
+# OCM balance analysis
+balance_page <- makePage(
+  title = "Анализ затрат и выгод ОЦМ",
+  subtitle = "Расчеты НИУ ВШЭ",
+  contents = div(
+    info_card(text = tags$span(HTML('На графике представлен <b>баланс фактических затрат и выгод</b>, реализовавшихся в отрасли после введения
+                                    обязательной цифровой маркировки. Расчет производится на основе данных статистики Росстата. Для каждого показателя из точки 
+                                    "до введения ОЦМ" строится трендовый прогноз развития отрасли для сценария, в котором маркировка не вводится.
+                                    Эффект от введения ОЦМ определяется как отклонение фактической отраслевой динамики от прогнозных значений.')),
+              toggle_id = NULL,
+              download_id = NULL,
+              display_download=FALSE),
+    tags$div(
+      tags$div(
+        plotlyOutput('balance_plot'),
+               style="flex-basis: 75%; display: flex; align-items: center;"
+        ),
+      tags$div(),
+    style="display:flex; flex-wrap:nowrap; flex-direction:row;"),
+    style='height:1300px;'
+  )
+)
 #---------------------------------------------------------------------------------------------------
 # Define unique URLs for pages & setup the UI
 #---------------------------------------------------------------------------------------------------
 router <- make_router(
-  route("/", home_page),
+  # route("/", home_page),
+  route("/", cons_page),
   route('market', market_page),
-  route("cons", cons_page),
   route("prod", prod_page),
-  route("counterfeit", cntf_page)
+  route("counterfeit", cntf_page),
+  route("balance", balance_page)
+  
 )
 ui <- fluentPage(
   lay(router$ui),
@@ -597,7 +625,7 @@ server <- function(input, output, session) {
                           "))
       # Highlighting the page in the menu
       script <- ''
-      for (i in c('cons', 'prod', 'market')) {
+      for (i in c('prod', 'market', 'counterfeit', 'balance')) {
         script <- paste(script, 
                         paste("$('[href=", '"', "#!/", i, '"', "]').addClass('unchosen_page'); ", sep = ""), sep="")
       }
@@ -605,26 +633,26 @@ server <- function(input, output, session) {
       shinyjs::runjs(paste("$('[href=", '"', "#!/", '"', "]').removeClass('unchosen_page').addClass('chosen_page')", sep = ""))
     } else {
       # Highlighting pages in the menu
-      if (is_page('cons')) {
-        shinyjs::runjs(HTML("
-      $('#choice_markets').css('display', 'none');
-      $('#choice_models').css('display', 'block');
-                          "))
-        script <- ''
-        for (i in c('', 'prod', 'market')) {
-          script <- paste(script, 
-                          paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
-        }
-        shinyjs::runjs(script) 
-        shinyjs::runjs(paste("$('[href=", '"', "#!/cons", '"', "]').addClass('chosen_page')", sep = "")) 
-      }
+      # if (is_page('cons')) {
+      #   shinyjs::runjs(HTML("
+      # $('#choice_markets').css('display', 'none');
+      # $('#choice_models').css('display', 'block');
+      #                     "))
+      #   script <- ''
+      #   for (i in c('', 'prod', 'market')) {
+      #     script <- paste(script, 
+      #                     paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
+      #   }
+      #   shinyjs::runjs(script) 
+      #   shinyjs::runjs(paste("$('[href=", '"', "#!/cons", '"', "]').addClass('chosen_page')", sep = "")) 
+      # }
       if (is_page('prod')) {
         shinyjs::runjs(HTML("
       $('#choice_markets').css('display', 'block');
       $('#choice_models').css('display', 'none');
                           "))
         script <- ''
-        for (i in c('', 'cons', 'market')) {
+        for (i in c('', 'market', 'counterfeit', 'balance')) {
           script <- paste(script, 
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
@@ -638,7 +666,33 @@ server <- function(input, output, session) {
       $('#choice_markets').css('display', 'block');
                           "))
         script <- ''
-        for (i in c('', 'prod', 'cons')) {
+        for (i in c('', 'prod', 'counterfeit', 'balance')) {
+          script <- paste(script, 
+                          paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
+        }
+        shinyjs::runjs(script) 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/market", '"', "]').addClass('chosen_page')", sep = "")) 
+      }
+      if (is_page('counterfeit')) {
+        shinyjs::runjs(HTML("
+      $('#choice_models').css('display', 'none');
+      $('#choice_markets').css('display', 'block');
+                          "))
+        script <- ''
+        for (i in c('', 'prod', 'market', 'balance')) {
+          script <- paste(script, 
+                          paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
+        }
+        shinyjs::runjs(script) 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/market", '"', "]').addClass('chosen_page')", sep = "")) 
+      }
+      if (is_page('balance')) {
+        shinyjs::runjs(HTML("
+      $('#choice_models').css('display', 'none');
+      $('#choice_markets').css('display', 'block');
+                          "))
+        script <- ''
+        for (i in c('', 'prod', 'market', 'counterfeit')) {
           script <- paste(script, 
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
@@ -697,6 +751,13 @@ server <- function(input, output, session) {
     # Load model data
     estimated <- model()
     weight = estimated$weight
+    if ("marking" %in% names(estimated$decomp2)) {
+      markingImpact <- round(estimated$cump_impact['Маркировка'],2)
+    } else {
+      markingImpact <- NA
+    }
+    
+    
     model_name <- estimated$model_name
     n.ahead <- estimated$n.ahead
     weekly <- estimated$weekly
@@ -845,17 +906,17 @@ server <- function(input, output, session) {
           icon = ifelse(yoy_change > 0, "fa-arrow-up", "fa-arrow-down")
         ),
         # CPI weight card
-        if (is.na(weight)) {
+        if (is.na(markingImpact)) {
           makeCard(
-            title = Text('Вес в ИПЦ недоступен', variant = 'mediumPlus'),
+            title = Text('ОЦМ не ведется', variant = 'mediumPlus'),
             size = 10,
             card_type = 'neutral',
             icon = 'fa-shopping-basket'
           )
         } else {
           makeCard(
-            title = paste(weight, '%', sep = ''),
-            content2 = Text('Вес в ИПЦ', variant = 'mediumPlus'),
+            title = paste(markingImpact, ' ', rub, sep = ''),
+            content2 = Text('Вклад ОЦМ в цену', variant = 'mediumPlus'),
             size = 10,
             card_type = 'neutral',
             icon = 'fa-shopping-basket'
@@ -1121,9 +1182,15 @@ server <- function(input, output, session) {
       !is.na(market()$counterfeit),
       "Данные по доле нелегального розничного оборота недоступны"
     ))
-    try(counterfeit_plot(market()))
+    try(counterfeit_plot(market(), opacity=0))
   })
-  counterfeit_plot
+  output$balance_plot <- renderPlotly({
+    validate(need(
+      !is.na(market()$counterfeit),
+      "Данные по балансу затрат и выгод ОЦМ недоступны"
+    ))
+    try(balance_plot(market()))
+  })
   # Plot supply structure on respective page
   output$supply_analysis <- renderPlotly({
     stack_supply(market(), sa = input$sa_toggle_m, type=input$type_supply)
@@ -1194,11 +1261,14 @@ server <- function(input, output, session) {
     final <- final[order(final[,1], decreasing=TRUE),]
     final <- rbind(final, other)
     final <- cbind(rownames(final), final)
-    names(final) <- c('Фактор', 'Объясняющаяя способность', 'Накопленный вклад в цену')
-    final[,2] <- paste(final[,2], '%', sep='')
-    final[,3] <- paste(final[,3], ' руб.', sep='')
+    # names(final) <- c('Фактор', 'Объясняющаяя способность', 'Накопленный вклад в цену')
+    final <- final[,c(1,3)]
+    names(final) <- c('Фактор', 'Накопленный вклад в цену')
+    final[,2] <- paste(final[,2], ' руб.', sep='')
+    # final[,2] <- paste(final[,2], '%', sep='')
+    # final[,3] <- paste(final[,3], ' руб.', sep='')
     final
-  }, align='lcc')
+  }, align='lc')
   # Generate y-o-y downloadable .xlsx
   output$download_yearly_shadow <- downloadHandler(
     filename = function() {
