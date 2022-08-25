@@ -1026,7 +1026,8 @@ counterfeit_plot <- function(data, opacity) {
       yref = "paper",  
       xanchor = "center",  
       yanchor = "bottom",  
-      showarrow = FALSE 
+      showarrow = FALSE,
+      font = list(size = 18)
     ),  
     list( 
       x = 0.25,  
@@ -1036,11 +1037,12 @@ counterfeit_plot <- function(data, opacity) {
       yref = "paper",  
       xanchor = "center",  
       yanchor = "bottom",  
-      showarrow = FALSE 
+      showarrow = FALSE,
+      font = list(size = 18)
     )
   )
   combo <- subplot(cntft_dyn, cntft_plot, nrows  = 1, titleY = TRUE) %>% layout(annotations = annotations, showlegend = F, plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
-                                                                                autosize = T, dragmode=FALSE) %>%
+                                                                                dragmode=FALSE) %>%
     config(displayModeBar = F, locale = 'ru')
   combo
 }
