@@ -389,7 +389,7 @@ cons_page <- makePage(
          downloadLink("download_str_shadow", "Скачать данные в .xlsx"),
          style='visibility:hidden; overflow:hidden;'),
     pivot_consumer,
-    style='height:1000px;'
+    style='height:1300px;'
   )
 )
 
@@ -417,7 +417,7 @@ prod_page <- makePage(
   contents = div(
     div(class = "cards", cards_ppi),
     pivot_prodprices,
-    style='height:600px;'
+    style='height:1300px;'
   )
 )
 
@@ -546,10 +546,10 @@ balance_page <- makePage(
     tags$div(
       tags$div(
         plotlyOutput('balance_plot'),
-               style="flex-basis: 75%; display: flex; align-items: center;"
+               style="flex-basis: 50%; display: flex; align-items: center; "
         ),
-      tags$div(),
-    style="display:flex; flex-wrap:nowrap; flex-direction:row;"),
+      tags$div(plotlyOutput('tax_delta_structure')),
+    style="display:flex; flex-wrap:nowrap; flex-direction:row;justify-content: space-around;"),
     style='height:1300px;'
   )
 )
@@ -1193,6 +1193,13 @@ server <- function(input, output, session) {
       "Данные по балансу затрат и выгод ОЦМ недоступны"
     ))
     try(balance_plot(market()))
+  })
+  output$tax_delta_structure <- renderPlotly({
+    validate(need(
+      !is.na(market()$counterfeit),
+      "Данные по балансу затрат и выгод ОЦМ недоступны"
+    ))
+    try(tax_delta_structure(market()))
   })
   # Plot supply structure on respective page
   output$supply_analysis <- renderPlotly({

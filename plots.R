@@ -639,7 +639,7 @@ plot_trade <- function(data, date_choice) {
     theme(legend.position="none")
   p1 <- ggplotly(p1, height=700, tooltip='text') %>%
     config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
-  df <- data$trade_shares
+  df <- data$trade_shares %>% mutate(share=share*100)
   p2 <- df %>% ggplot() +
     geom_line(aes(x=date, y=share, col=type, text=paste0('Доля',
                                                          ifelse(type=="Экспорт", ' экспорта', ' импорта'),
@@ -717,7 +717,7 @@ plot_trade <- function(data, date_choice) {
     list( 
       x = 0.5,  
       y = 1.0,  
-      text = "Крупнейшие торговые партнеры",  
+      text = paste0("Крупнейшие торговые партнеры, ", as.yearmon(date_choice)), 
       xref = "paper",  
       yref = "paper",  
       xanchor = "center",  
@@ -807,15 +807,18 @@ retail_trade <- function(data, sa=TRUE) {
       mutate(total = sum(value, na.rm=TRUE))
     colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
     p <- ggplot(df) +
-      geom_bar(aes(fill=OKATO, y=value, x=date, text=paste0('Продажи, ', OKATO, ', ', as.yearmon(date), ':', format(value, big.mark=" "), ' руб.')), stat="identity") +
-      geom_line(aes(y=total, x=date, color='Итого', text=paste0('Продажи, всего, ', as.yearmon(date), ': ', format(total, big.mark=" "), ' руб.'),
+      geom_col(aes(fill=OKATO, y=value, x=date, text=paste0('Продажи, ', OKATO, ', ', as.yearmon(date), ': ', format(value, big.mark=" "), ' тыс. руб.')), position='stack') +
+      geom_line(aes(y=total, x=date, color='Итого', text=paste0('Продажи, всего, ', as.yearmon(date), ': ', format(total, big.mark=" "), ' тыс. руб.'),
                     group=1),
                 size=1.2) +
       xlab('') +
+      ylab('Розничные продажи, тыс. руб.') +
+      scale_y_continuous(labels=function(x) format(x, big.mark = " ", scientific = FALSE)) +
       scale_fill_manual(values = colors, name='') +
       scale_x_date(breaks='6 months', labels = scales::label_date("%b-%y"), expand=expansion(add = 10)) +
       scale_color_manual(values = c("Итого" = "#008272"), name='') +
       theme(legend.position="bottom")
+    p
     t <- ggplotly(p, tooltip='text') %>%
       config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)") %>%
       layout(legend = list(orientation = "h", x = 0, y = -0.1))
@@ -849,11 +852,13 @@ retail_trade <- function(data, sa=TRUE) {
   t
 } 
 margin_plot <- function(data) {
-  df <- data$margin
+  df <- data$margin %>%
+    mutate(value = value*100)
   df$type <- case_when(
     str_detect(df$name,'розн') ~ 'Розничная торговля',
     str_detect(df$name,'оптов') ~ 'Оптовая торговля',
   )
+  
   p <- df %>% ggplot() + geom_line(aes(x=date, y=value, col=type, text=paste0('Уровень наценки',
                                                                                 ', ',
                                                                                 as.yearmon(date),
@@ -869,6 +874,22 @@ margin_plot <- function(data) {
     config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)") %>%
     layout(legend = list(orientation = "h", x = 0.3, y = -0.1))
   p 
+} 
+empty_plot <- function(title = NULL, x, y){
+  p <- plotly_empty(type = "scatter", mode = "markers") %>%
+    config(
+      displayModeBar = FALSE
+    ) %>%
+    layout(
+      title = list(
+        text = title,
+        font = list(size=15),
+        yref = "paper",
+        y = y, 
+        x = x
+      )
+    )
+  return(p)
 } 
 balance_plot <- function(data) {
   deltas <- data$meanImpact
@@ -895,15 +916,64 @@ balance_plot <- function(data) {
                                                     xend = id + 0.6,
                                                     y = end,
                                                     yend = end), col='darkgray') +
-      geom_text(aes(x=desc, y=start+(end-start)/2, label=paste0(value)), color="black", size=4) + 
+      geom_text(aes(x=desc, y=start+(end-start)/2, label=paste0(value)), color="black", size=4) +
+      coord_flip() +
+      ggtitle('Баланс затрат и выгод') +
       ylab('млрд руб.') +
       xlab(NULL) +
       scale_fill_manual(values=c("in"="#B0E3AB", "out"="#F9AAB0", "net"='#C7E0F4')) +
-      theme(legend.position = 'none')
+      theme(legend.position = 'none', plot.title = element_text(hjust = 0.5))
     balance <- ggplotly(balance, tooltip='text') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
                                                             autosize = T, dragmode=FALSE,  
                                                             xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
     balance$x$data[[7]]$hoverinfo <- "none"
+    
+    # df2 <- df %>% 
+    #   filter(desc == 'Налоги') %>%
+    #   pull(value)
+    # 
+    # taxStruct = data$taxStruct
+    # df2 = data.frame(value = round(df2 * (taxStruct %>% pull(structure)),1),
+    #                  name = taxStruct %>% pull(type))
+    # df2 <- df2[order(df2$value, decreasing=T),]
+    # df2 <- df2[c(2:nrow(df2),1),]
+    # df2$id <- seq_along(df2$value)
+    # df2$name <- factor(df2$name, levels = df2$name)
+    # df2$type <- ifelse(df2$value > 0, "in", "out")
+    # df2[df2$name %in% c("Всего"), "type"] <- "net"
+    # 
+    # df2$end <- cumsum(df2$value)
+    # df2$end <- c(head(df2$end, -1), 0)
+    # df2$start <- c(0, head(df2$end, -1))
+    # df2 <- df2[, c(3, 1, 4, 6, 5, 2)]
+    # 
+    # balance_tax <- df2 %>%
+    #   ggplot() +
+    #   geom_rect(aes(x = name, fill = type, xmin = id - 0.4, xmax = id + 0.4, ymin = end, ymax = start, text=
+    #                   paste0(name, ': ', value, ' млрд руб.')
+    #   )) +
+    #   geom_segment(data = df2[1:(nrow(df2) -1),], aes(x = id + 0.4,
+    #                                                 xend = id + 0.6,
+    #                                                 y = end,
+    #                                                 yend = end), col='darkgray') +
+    #   geom_text(aes(x=name, y=start+(end-start)/2, label=paste0(value)), color="black", size=4) +
+    #   coord_flip() +
+    #   # ggtitle('Прирост налоговых поступлений') +
+    #   ylab('млрд руб.') +
+    #   xlab(NULL) +
+    #   scale_fill_manual(values=c("in"="#B0E3AB", "out"="#F9AAB0", "net"='#C7E0F4')) +
+    #   theme(legend.position = 'none', plot.title = element_text(hjust = 0.5))
+    # balance_tax
+    # balance_tax <- ggplotly(balance_tax, tooltip='text') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+    #                                                         autosize = T, dragmode=FALSE,  
+    #                                                         xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+    # balance_tax$x$data[[8]]$hoverinfo <- "none"
+    # 
+    # balance_tax
+      
+      
+    
+    
     # balance
     empl_fig <- plot_ly(
       domain = list(x = c(0.25, 0.5), y = c(0.8, 1)),
@@ -915,7 +985,6 @@ balance_plot <- function(data) {
       title = list(text = "Занятость, чел.", font = list(size=18, family='Segoe UI', color='#323130')),
       # height = 150
     )
-    empl_fig$x$cur_data
     capacity_fig <- plot_ly(
       domain = list(x = c(0.5, 0.75), y = c(0.8, 1)),
       type = "indicator",
@@ -934,35 +1003,75 @@ balance_plot <- function(data) {
     combo3 <- subplot(combo2, balance, nrows=2, titleY = TRUE, which_layout=2, heights=c(0.25,0.75)) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
                                                                                                   autosize = T, dragmode=FALSE,  
                                                                                                   xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
-    # combo3
   } else {
-    empty_plot <- function(title = NULL, x, y){
-      p <- plotly_empty(type = "scatter", mode = "markers") %>%
-        config(
-          displayModeBar = FALSE
-        ) %>%
-        layout(
-          title = list(
-            text = title,
-            font = list(size=15),
-            yref = "paper",
-            y = y, 
-            x = x
-          )
-        )
-      return(p)
-    } 
     combo3 <- empty_plot("Баланс затрат и выгод ОЦМ еще не рассчитан", x = 0.5, y=0.5) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
                                                                                                    autosize = T, dragmode=FALSE,  
                                                                                                    xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
   }
   combo3 %>% config(displayModeBar = F)
 }
-counterfeit_plot <- function(data, opacity) {
+tax_delta_structure <- function(data) {
+  deltas <- data$meanImpact
+  if (!is.null(deltas)) {
+  vals <- round(c(deltas$d_tax_implied, deltas$d_prod, deltas$d_fot, -deltas$marking_cost)/10^9,1)
+  df <- data.frame(
+      desc=c('Налоги', 'Выручка', 'ФОТ', 'Издержки', 'Итого'),
+      value=c(vals, sum(vals))
+    )
+  df2 <- df %>% 
+    filter(desc == 'Налоги') %>%
+    pull(value)
+  
+  taxStruct = data$taxStruct
+  df2 = data.frame(value = round(df2 * (taxStruct %>% pull(structure)),1),
+                   name = taxStruct %>% pull(type))
+  df2 <- df2[order(df2$value, decreasing=T),]
+  df2 <- df2[c(2:nrow(df2),1),]
+  df2$id <- seq_along(df2$value)
+  df2$name <- factor(df2$name, levels = df2$name)
+  df2$type <- ifelse(df2$value > 0, "in", "out")
+  df2[df2$name %in% c("Всего"), "type"] <- "net"
+  
+  df2$end <- cumsum(df2$value)
+  df2$end <- c(head(df2$end, -1), 0)
+  df2$start <- c(0, head(df2$end, -1))
+  df2 <- df2[, c(3, 1, 4, 6, 5, 2)]
+  
+  balance_tax <- df2 %>%
+    ggplot() +
+    geom_rect(aes(x = name, fill = type, xmin = id - 0.4, xmax = id + 0.4, ymin = end, ymax = start, text=
+                    paste0(name, ': ', value, ' млрд руб.')
+    )) +
+    geom_segment(data = df2[1:(nrow(df2) -1),], aes(x = id + 0.4,
+                                                    xend = id + 0.6,
+                                                    y = end,
+                                                    yend = end), col='darkgray') +
+    geom_text(aes(x=name, y=start+(end-start)/2, label=paste0(value)), color="black", size=4) +
+    coord_flip() +
+    ggtitle('Прирост налоговых поступлений') +
+    ylab('млрд руб.') +
+    xlab(NULL) +
+    scale_fill_manual(values=c("in"="#B0E3AB", "out"="#F9AAB0", "net"='#C7E0F4')) +
+    theme(legend.position = 'none', plot.title = element_text(hjust = 0.5))
+  balance_tax
+  balance_tax <- ggplotly(balance_tax, tooltip='text') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                                  autosize = T, dragmode=FALSE,  
+                                                                  xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  balance_tax$x$data[[8]]$hoverinfo <- "none"
+  } else {
+    balance_tax <- empty_plot("Прирост налоговых поступлений еще не расчитан", x = 0.5, y=0.5) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                                                         autosize = T, dragmode=FALSE,  
+                                                                                         xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  }
+  balance_tax %>% config(displayModeBar = F)
+  
+}
+counterfeit_plot <- function(data, opacity=0) {
   df <- data$counterfeit %>%
-    drop_na() 
+    drop_na() %>%
+    filter(date > as.Date('2014-01-01'))
   value <- last(df %>%
-                  pull(counterfeit))
+                  pull(counterfeit_smooth))
   date <- last(df %>%
                  pull(date))
   cntft_plot <- plot_ly(
@@ -984,8 +1093,8 @@ counterfeit_plot <- function(data, opacity) {
       font = list(size=18, family='Segoe UI', color='#323130')
     )
   ) 
-  df <- df %>%
-    mutate(counterfeit_smooth = lowess(df$counterfeit, f=1/4)$y)
+  # df <- df %>%
+  #   mutate(counterfeit_smooth = lowess(df$counterfeit, f=1/4)$y)
   cntft_dyn <- plot_ly(df,
                        x = df$date, y = df$counterfeit_smooth, mode = 'lines', hoverinfo = 'text', text=paste0('Доля нелегального оборота',
                                                                                                                    ', ',
@@ -993,7 +1102,7 @@ counterfeit_plot <- function(data, opacity) {
                                                                                                                    ': ',
                                                                                                                    format(round(df$counterfeit_smooth, 1), big.mark=" "), 
                                                                                                                    '%'),
-                       type = "scatter", line = list(color = " #007d3c")) %>%
+                       type = "scatter", line = list(color = "#007d3c")) %>%
     add_trace(y = ~counterfeit, name = 'trace 0', mode = 'lines', opacity=opacity, hoverinfo = 'none')  %>%
     layout(yaxis = list(title = 'Доля нелегального оборота, %', fixedrange=T), 
            xaxis = list(fixedrange = TRUE, dtick = "M3", tickformat="%qК%Y%"))
@@ -1013,8 +1122,28 @@ counterfeit_plot <- function(data, opacity) {
 
     cntft_dyn <- cntft_dyn %>%
       layout(shapes = list(vline(data$markingDate))) %>%
-      add_annotations(showlegend = FALSE, x = data$markingDate+months(1), y = max(max(df$counterfeit_smooth), max(df$counterfeit))*0.8,
-                      text = c("Начало ОЦМ в отрасли"), textangle = 270, hoverinfo='none', showarrow=F) 
+      add_segments(x = data$markingDate, xend = last(df$date), y = df[df$date==data$markingDate,'counterfeit_smooth'], text=NA, yend = df[df$date==data$markingDate,'counterfeit_smooth'], line = list(color='black')) %>%
+      # add_segments(x = last(df$date), xend = last(df$date), y = df[df$date==data$markingDate,'counterfeit_smooth'], yend = last(df$counterfeit_smooth), line = list(dash = "dash")) %>%
+      add_annotations(x = last(df$date),
+                       y = last(df$counterfeit_smooth),
+                       xref = "x", yref = "y",
+                       axref = "x", ayref = "y",
+                       text = "",
+                       arrowcolor = "black",
+                       showarrow = T,
+                       line = list(dash = "dash"),
+                       ax = last(df$date),
+                       ay = df[df$date==data$markingDate,'counterfeit_smooth']) %>%
+      add_annotations(x = as.Date(round( (as.numeric(data$markingDate) + as.numeric(last(df$date))) /2,0)),
+                       y = df[df$date==data$markingDate,'counterfeit_smooth']*1.1,
+                       xref = "x", yref = "y",
+                       text = paste0( round( last(df$counterfeit_smooth) - df[df$date==data$markingDate,'counterfeit_smooth'], 1), '%'),
+                       font = list(size=18),
+                       showarrow = F) %>%
+      add_annotations(x = data$markingDate-months(10), y = max(max(df$counterfeit_smooth), max(df$counterfeit))*0.9,
+                      text = c("Начало ОЦМ в отрасли"), hoverinfo='none', showarrow=F) 
+    cntft_dyn %>% layout(showlegend = FALSE)
+    
   }
   
   annotations = list( 
