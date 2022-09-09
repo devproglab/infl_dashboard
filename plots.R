@@ -673,7 +673,7 @@ plot_trade <- function(data, date_choice) {
                         arrange(NAPR, desc(value)) %>%
                         mutate(label_y = cumsum(value) - 0.5*value))
   p3 <- df %>% 
-    ggplot(aes(x = NAPR, y = value, fill = reorder(NAME, value), text=paste0(NAPR,' в ',NAME,', ',as.yearmon(date),': ',
+    ggplot(aes(x = NAPR, y = value, fill = reorder(NAME, value), text=paste0(NAPR, ifelse(NAPR=='ЭК', ' в ', ' из '),NAME,', ',as.yearmon(date),': ',
                                                                                  format(round(value), big.mark=" "), ' ', ed))) + 
     bars +
     labels +
@@ -753,7 +753,8 @@ plot_trade <- function(data, date_choice) {
 
 trade_prices <- function(data, convert) {
   df <- data$trade_price
-  ed <- tolower(df$EDIZM[1])
+  # ed <- tolower(df$EDIZM[1])
+  ed <- data$ed_tradeprice
   p <- df %>% mutate(NAPR = case_when(NAPR=='ЭК' ~ "Экспорт", NAPR=='ИМ' ~ 'Импорт')) 
   if (convert) {
     p <- p %>% select(-mean_price) %>% rename("mean_price"="mean_price_rub")
@@ -765,7 +766,7 @@ trade_prices <- function(data, convert) {
                                                          as.yearmon(date),
                                                          ': ',
                                                          round(mean_price, 2), 
-                                                         ifelse(convert, 'руб./', '$/'), ed),
+                                                         ifelse(convert, ' руб./', '$/'), ed),
                   group=NAPR)) +
     geom_text(data=last(df %>% filter(NAPR=='Экспорт')), aes(x=date, y=mean_price), label="Экспорт", vjust=1.5) +
     geom_text(data=last(df %>% filter(NAPR=='Импорт')), aes(x=date, y=mean_price), label="Импорт", vjust=1.5) +
@@ -779,13 +780,15 @@ trade_prices <- function(data, convert) {
 }
 prod_prices <- function(data) {
   df <- data$prod_price
+  our_strwrap <- function(x) sapply(strwrap(x, width = 40, simplify= FALSE), paste, collapse = "\n")
   # ed <- tolower(df$EDIZM[1])
-  p <- df %>% ggplot() + geom_line(aes(x=date, y=value, col='blue', text=paste0('Средние цены производителей',
+  p <- df %>% ggplot() + geom_line(aes(x=date, y=value, col=group, group=group, text=paste0('Средние цены производителей, ', 
+                                                our_strwrap(OKPD),
                                                ', ',
                                                as.yearmon(date),
                                                ': ',
                                                round(value, 2), 
-                                               'руб.'),
+                                               ' руб.'),
                          group=1)) +
     xlab('') +
     ylab('руб.') +
@@ -893,7 +896,7 @@ empty_plot <- function(title = NULL, x, y){
 } 
 balance_plot <- function(data) {
   deltas <- data$meanImpact
-  if (!is.null(deltas)) {
+  if (!is.na(deltas)) {
     vals <- round(c(deltas$d_tax_implied, deltas$d_prod, deltas$d_fot, -deltas$marking_cost)/10^9,1)
     df <- data.frame(
       desc=c('Налоги', 'Выручка', 'ФОТ', 'Издержки', 'Итого'),
@@ -1012,7 +1015,7 @@ balance_plot <- function(data) {
 }
 tax_delta_structure <- function(data) {
   deltas <- data$meanImpact
-  if (!is.null(deltas)) {
+  if (!is.na(deltas)) {
   vals <- round(c(deltas$d_tax_implied, deltas$d_prod, deltas$d_fot, -deltas$marking_cost)/10^9,1)
   df <- data.frame(
       desc=c('Налоги', 'Выручка', 'ФОТ', 'Издержки', 'Итого'),
@@ -1064,9 +1067,9 @@ tax_delta_structure <- function(data) {
                                                                                          xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
   }
   balance_tax %>% config(displayModeBar = F)
-  
 }
 counterfeit_plot <- function(data, opacity=0) {
+  if (!is.na(data$counterfeit)) {
   df <- data$counterfeit %>%
     drop_na() %>%
     filter(date > as.Date('2014-01-01'))
@@ -1173,6 +1176,13 @@ counterfeit_plot <- function(data, opacity=0) {
   combo <- subplot(cntft_dyn, cntft_plot, nrows  = 1, titleY = TRUE) %>% layout(annotations = annotations, showlegend = F, plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
                                                                                 dragmode=FALSE) %>%
     config(displayModeBar = F, locale = 'ru')
-  combo
+  combo 
+  } else {
+    combo <- empty_plot("Доля нелегального оборота еще не рассчитана", x = 0.5, y=0.5) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                                                                   autosize = T, dragmode=FALSE,  
+                                                                                                   xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+    combo %>% config(displayModeBar = F)
+  
+  }
 }
 # colours=c("#e83131", "#ffbfbf", "dark gray", "#c3ffbf","#3AE831"),

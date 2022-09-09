@@ -396,7 +396,12 @@ cons_page <- makePage(
 # Producer, import & export prices page
 pivot_prodprices <- Pivot(
   PivotItem(headerText = 'Цены производителей',
-            info_card(text = tags$span("На графике изображены",  tags$b(" средние отпускные цены производителей "), "промышленной продукции для товаров, входящих в рассматриваемую товарную группу."),
+            info_card(text = tags$span("На графике изображены",  
+                                       tags$b(" средние отпускные цены производителей "),
+                                       "промышленной продукции для товаров, входящих в рассматриваемую товарную группу.",
+                                       tags$br(),
+                                       "В случае, если для товарной группы доступны несколько рядов, на панели сверху отражаются средневзвешенные значения."
+                                       ),
                       # toggle_id = "sa_toggle",
                       # toggleOn = "Сезонное сглаживание включено",
                       # toggleOff = "Сезонное сглаживание отключено",
@@ -933,103 +938,116 @@ server <- function(input, output, session) {
     # Load model data
     data <- market()
     model_name <- data$category
-    ed <- last(unique(data$prod_price$OKEI))
-    ed <- case_when(
-      ed=='Тысяча штук' ~ 'тыс. шт.',
-      ed=='литр' ~ 'л.'
-    )
-    rub <- '\U20BD'
-    price = round(last(data$prod_price$value), 2)
-    # Get date of the latest data point for PPI and create a label
-    label_current <- date_to_lab(last(data$prod_price$date))
-    prod_price_names <- data$prod_price_names
-    # trade prices
-    label_current_trade <-date_to_lab(last(data$trade_price$date))
-    price_ex <- round(last(data$trade_price[data$trade_price$NAPR=='ЭК',]$mean_price_rub))
-    price_im <- round(last(data$trade_price[data$trade_price$NAPR=='ИМ',]$mean_price_rub))
-    
-    # producer inflation
-    label_prev <- date_to_lab(nth(data$prod_price$date, -2))
-    label_yoy <- date_to_lab(nth(data$prod_price$date, -13))
-    ppi_prev <- round((last(data$prod_price$value) / nth(data$prod_price$value, -2) - 1) * 100, 2)
-    ppi_yoy <- round((last(data$prod_price$value) / nth(data$prod_price$value, -13) -1 ) * 100, 2)
-    
-    # Stack 3 cards together
-    Stack(
-      div(model_name, style = 'margin-bottom:10px;', class = 'ms-fontSize-20 ms-fontWeight-regular'),
+    ed <- unique(data$prod_price$OKEI)
+    n <- which(is.na(ed))
+    ed <- ed[-n]
+    ed <- unique(last(ed))
+    if (length(ed)>1) {
+      print('DIFFERENT MEASURES FOR PRODUCER PRICES. CORRECT!')
+    } else {
+      ed <- case_when(
+        ed=='Тысяча штук' ~ 'тыс. шт.',
+        ed=='литр' ~ 'л.',
+        ed=='Тонна;^метрическая тонна (1000 кг)' ~ 'т.'
+      )
+      ed_tradeprice <- data$ed_tradeprice
+      rub <- '\U20BD'
+      pp_dataset <- data$prod_price %>%
+        group_by(date) %>%
+        summarize(value = mean(value, na.rm=TRUE))
+      price = round(last(pp_dataset$value), 2)
+      # Get date of the latest data point for PPI and create a label
+      label_current <- date_to_lab(last(pp_dataset$date))
+      prod_price_names <- data$prod_price_names
+      # trade prices
+      label_current_trade <-date_to_lab(last(data$trade_price$date))
+      price_ex <- round(last(data$trade_price[data$trade_price$NAPR=='ЭК',]$mean_price_rub))
+      price_im <- round(last(data$trade_price[data$trade_price$NAPR=='ИМ',]$mean_price_rub))
+      
+      # producer inflation
+      label_prev <- date_to_lab(nth(pp_dataset$date, -2))
+      label_yoy <- date_to_lab(nth(pp_dataset$date, -13))
+      ppi_prev <- round((last(pp_dataset$value) / nth(pp_dataset$value, -2) - 1) * 100, 2)
+      ppi_yoy <- round((last(pp_dataset$value) / nth(pp_dataset$value, -13) -1 ) * 100, 2)
+      # Stack 3 cards together
       Stack(
-        horizontal = TRUE,
-        horizontalAlign = 'space-between',
-        tokens = list(childrenGap = 10),
-        # current producer price card
-        makeCard(
-          title = paste(
-            price,
-            ' ',
-            rub,
-            '/',
-            ed,
-            sep = ''
+        div(model_name, style = 'margin-bottom:10px;', class = 'ms-fontSize-20 ms-fontWeight-regular'),
+        Stack(
+          horizontal = TRUE,
+          horizontalAlign = 'space-between',
+          tokens = list(childrenGap = 10),
+          # current producer price card
+          makeCard(
+            title = paste(
+              format(price, big.mark = ' '),
+              ' ',
+              rub,
+              '/',
+              ed,
+              sep = ''
+            ),
+            content2 = span(Text(paste('Цены производителей, ', label_current, sep = ''), variant = 'mediumPlus'),
+                            tags$sup(TooltipHost(
+                              content = span(paste0('До 2017 года по ОКПД: "', prod_price_names[[1]], '"'), tags$br(), paste0('После 2017 года по ОКПД2: "', prod_price_names[[2]], '"')),
+                              delay = 0,
+                              Text(FontIcon(iconName = 'info'))
+                            ))),
+            size = 10,
+            card_type = 'neutral',
+            icon = 'fa-coins'
           ),
-          content2 = span(Text(paste('Цены производителей, ', label_current, sep = ''), variant = 'mediumPlus'),
-                          tags$sup(TooltipHost(
-                            content = span(paste0('До 2017 года по ОКПД: "', prod_price_names[[1]], '"'), tags$br(), paste0('После 2017 года по ОКПД2: "', prod_price_names[[2]], '"')),
-                            delay = 0,
-                            Text(FontIcon(iconName = 'info'))
-                          ))),
-          size = 10,
-          card_type = 'neutral',
-          icon = 'fa-coins'
-        ),
-        # y-o-y card
-        makeCard(
-          title = paste(
-            ifelse(ppi_yoy > 0, '+', ''),
-            ppi_yoy,
-            '%',
-            sep = ''
+          # y-o-y card
+          makeCard(
+            title = paste(
+              ifelse(ppi_yoy > 0, '+', ''),
+              ppi_yoy,
+              '%',
+              sep = ''
+            ),
+            tooltip = paste(label_current, '/', label_yoy),
+            content = Text('Инфляция цен производителей, г/г:', variant = 'mediumPlus'),
+            content2 = Text('Инфляция цен производителей, м/м:', variant = 'mediumPlus'),
+            title2 = paste(
+              ifelse(ppi_prev > 0, '+', ''),
+              ppi_prev,
+              '%',
+              sep = ''
+            ),
+            tooltip2 = paste(label_current, ' / ', label_prev, sep =
+                               ''),
+            size = 10,
+            card_type = ifelse(ppi_yoy > 0, "bad", "good"),
+            icon = ifelse(ppi_yoy > 0, "fa-arrow-up", "fa-arrow-down")
           ),
-          tooltip = paste(label_current, '/', label_yoy),
-          content = Text('Инфляция цен производителей, г/г:', variant = 'mediumPlus'),
-          content2 = Text('Инфляция цен производителей, м/м:', variant = 'mediumPlus'),
-          title2 = paste(
-            ifelse(ppi_prev > 0, '+', ''),
-            ppi_prev,
-            '%',
-            sep = ''
-          ),
-          tooltip2 = paste(label_current, ' / ', label_prev, sep =
-                             ''),
-          size = 10,
-          card_type = ifelse(ppi_yoy > 0, "bad", "good"),
-          icon = ifelse(ppi_yoy > 0, "fa-arrow-up", "fa-arrow-down")
-        ),
-        # export-import price
-        makeCard(
-          content = Text(paste0('Цены экспортеров, ',label_current_trade,':'), variant = 'mediumPlus'),
-          content2 = Text(paste0('Цены импортеров, ',label_current_trade,':'), variant = 'mediumPlus'),
-          title = paste(
-            price_ex,
-            ' ',
-            rub,
-            '/',
-            ed,
-            sep = ''
-          ),
-          title2 = paste(
-            price_im,
-            ' ',
-            rub,
-            '/',
-            ed,
-            sep = ''
-          ),
-          size = 10,
-          card_type = 'neutral',
-          icon = 'fa-coins'
+          # export-import price
+          makeCard(
+            content = Text(paste0('Цены экспортеров, ',label_current_trade,':'), variant = 'mediumPlus'),
+            content2 = Text(paste0('Цены импортеров, ',label_current_trade,':'), variant = 'mediumPlus'),
+            title = paste(
+              price_ex,
+              ' ',
+              rub,
+              '/',
+              ed_tradeprice,
+              sep = ''
+            ),
+            title2 = paste(
+              price_im,
+              ' ',
+              rub,
+              '/',
+              ed_tradeprice,
+              sep = ''
+            ),
+            size = 10,
+            card_type = 'neutral',
+            icon = 'fa-coins'
+          )
         )
       )
-    )
+    }
+    
+
   })
   # value boxes for market analysis
   output$card_set_market <- renderUI({
@@ -1181,24 +1199,24 @@ server <- function(input, output, session) {
     try(plot_price_decomp(model()))
   })
   output$counterfeit_plot <- renderPlotly({
-    validate(need(
-      !is.na(market()$counterfeit),
-      "Данные по доле нелегального розничного оборота недоступны"
-    ))
+    # validate(need(
+    #   !is.na(market()$counterfeit),
+    #   "Данные по доле нелегального розничного оборота недоступны"
+    # ))
     try(counterfeit_plot(market(), opacity=0))
   })
   output$balance_plot <- renderPlotly({
-    validate(need(
-      !is.na(market()$counterfeit),
-      "Данные по балансу затрат и выгод ОЦМ недоступны"
-    ))
+    # validate(need(
+    #   !is.na(market()$counterfeit),
+    #   "Данные по балансу затрат и выгод ОЦМ недоступны"
+    # ))
     try(balance_plot(market()))
   })
   output$tax_delta_structure <- renderPlotly({
-    validate(need(
-      !is.na(market()$counterfeit),
-      "Данные по балансу затрат и выгод ОЦМ недоступны"
-    ))
+    # validate(need(
+    #   !is.na(market()$counterfeit),
+    #   "Данные по балансу затрат и выгод ОЦМ недоступны"
+    # ))
     try(tax_delta_structure(market()))
   })
   # Plot supply structure on respective page
