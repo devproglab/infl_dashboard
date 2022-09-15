@@ -940,15 +940,19 @@ server <- function(input, output, session) {
     model_name <- data$category
     ed <- unique(data$prod_price$OKEI)
     n <- which(is.na(ed))
-    ed <- ed[-n]
+    if (length(n)>0) {
+      ed <- ed[-n]
+    }
     ed <- unique(last(ed))
+    print(ed)
     if (length(ed)>1) {
       print('DIFFERENT MEASURES FOR PRODUCER PRICES. CORRECT!')
     } else {
       ed <- case_when(
         ed=='Тысяча штук' ~ 'тыс. шт.',
         ed=='литр' ~ 'л.',
-        ed=='Тонна;^метрическая тонна (1000 кг)' ~ 'т.'
+        ed=='Тонна;^метрическая тонна (1000 кг)' ~ 'т.',
+        ed=='Декалитр' ~ 'дал'
       )
       ed_tradeprice <- data$ed_tradeprice
       rub <- '\U20BD'
@@ -1095,7 +1099,7 @@ server <- function(input, output, session) {
         title = paste(
           retail_q,
           ' ',
-          rub,
+          ifelse(data$ed_retail == 'руб.', rub, data$ed_retail),
           sep = ''
         ),
         title2 = paste0(retail_q_yoy, '%'),

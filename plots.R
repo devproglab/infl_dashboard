@@ -665,7 +665,8 @@ plot_trade <- function(data, date_choice) {
   df <- data$trade_country %>% filter(date == date_choice) %>% mutate(NAPR = case_when(
     NAPR=='ИМ' ~ 'Импорт',
     NAPR=='ЭК' ~ 'Экспорт'))
-  ed <- tolower(data$trade_price$EDIZM[1])
+  # ed <- tolower(data$trade_price$EDIZM[1])
+  ed <- data$ed_tradeprice
   bars <- map(unique(df$NAPR)
                     , ~geom_bar(stat = "identity", position = "stack", data = df %>% filter(NAPR == .x)))
   labels <- geom_text(aes(y = label_y, label = NAME), colour = "white", 
@@ -673,7 +674,7 @@ plot_trade <- function(data, date_choice) {
                         arrange(NAPR, desc(value)) %>%
                         mutate(label_y = cumsum(value) - 0.5*value))
   p3 <- df %>% 
-    ggplot(aes(x = NAPR, y = value, fill = reorder(NAME, value), text=paste0(NAPR, ifelse(NAPR=='ЭК', ' в ', ' из '),NAME,', ',as.yearmon(date),': ',
+    ggplot(aes(x = NAPR, y = value, fill = reorder(NAME, value), text=paste0(NAPR, ifelse(NAPR=='ЭК', ' в ', ' из '), NAME,', ',as.yearmon(date),': ',
                                                                                  format(round(value), big.mark=" "), ' ', ed))) + 
     bars +
     labels +
@@ -810,12 +811,12 @@ retail_trade <- function(data, sa=TRUE) {
       mutate(total = sum(value, na.rm=TRUE))
     colors <- adjustcolor(brewer.pal(n = 9, name = 'Set1'), alpha.f=0.6)
     p <- ggplot(df) +
-      geom_col(aes(fill=OKATO, y=value, x=date, text=paste0('Продажи, ', OKATO, ', ', as.yearmon(date), ': ', format(value, big.mark=" "), ' тыс. руб.')), position='stack') +
-      geom_line(aes(y=total, x=date, color='Итого', text=paste0('Продажи, всего, ', as.yearmon(date), ': ', format(total, big.mark=" "), ' тыс. руб.'),
+      geom_col(aes(fill=OKATO, y=value, x=date, text=paste0('Продажи, ', OKATO, ', ', as.yearmon(date), ': ', format(value, big.mark=" "), ' ', data$ed_retail)), position='stack') +
+      geom_line(aes(y=total, x=date, color='Итого', text=paste0('Продажи, всего, ', as.yearmon(date), ': ', format(total, big.mark=" "), ' ', data$ed_retail),
                     group=1),
                 size=1.2) +
       xlab('') +
-      ylab('Розничные продажи, тыс. руб.') +
+      ylab(paste0('Розничные продажи, ', data$ed_retail)) +
       scale_y_continuous(labels=function(x) format(x, big.mark = " ", scientific = FALSE)) +
       scale_fill_manual(values = colors, name='') +
       scale_x_date(breaks='6 months', labels = scales::label_date("%b-%y"), expand=expansion(add = 10)) +
