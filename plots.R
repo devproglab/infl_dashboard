@@ -897,7 +897,7 @@ empty_plot <- function(title = NULL, x, y){
 } 
 balance_plot <- function(data) {
   deltas <- data$meanImpact
-  if (!is.na(deltas)) {
+  if (!is.na(deltas)[1]) {
     vals <- round(c(deltas$d_tax_implied, deltas$d_prod, deltas$d_fot, -deltas$marking_cost)/10^9,1)
     df <- data.frame(
       desc=c('Налоги', 'Выручка', 'ФОТ', 'Издержки', 'Итого'),
@@ -1070,7 +1070,7 @@ tax_delta_structure <- function(data) {
   balance_tax %>% config(displayModeBar = F)
 }
 counterfeit_plot <- function(data, opacity=0) {
-  if (!is.na(data$counterfeit)) {
+  if (class(data$counterfeit)=='data.frame') {
   df <- data$counterfeit %>%
     drop_na() %>%
     filter(date > as.Date('2014-01-01'))

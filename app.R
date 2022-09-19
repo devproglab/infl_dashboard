@@ -1215,7 +1215,7 @@ server <- function(input, output, session) {
     #   !is.na(market()$counterfeit),
     #   "Данные по балансу затрат и выгод ОЦМ недоступны"
     # ))
-    try(balance_plot(market()))
+    balance_plot(market())
   })
   output$tax_delta_structure <- renderPlotly({
     # validate(need(
