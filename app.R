@@ -1222,7 +1222,7 @@ server <- function(input, output, session) {
     #   !is.na(market()$counterfeit),
     #   "Данные по балансу затрат и выгод ОЦМ недоступны"
     # ))
-    try(tax_delta_structure(market()))
+    tax_delta_structure(market())
   })
   # Plot supply structure on respective page
   output$supply_analysis <- renderPlotly({
