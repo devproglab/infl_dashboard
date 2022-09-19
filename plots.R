@@ -1016,7 +1016,7 @@ balance_plot <- function(data) {
 }
 tax_delta_structure <- function(data) {
   deltas <- data$meanImpact
-  if (!is.na(deltas)) {
+  if (!is.na(deltas)[1]) {
   vals <- round(c(deltas$d_tax_implied, deltas$d_prod, deltas$d_fot, -deltas$marking_cost)/10^9,1)
   df <- data.frame(
       desc=c('Налоги', 'Выручка', 'ФОТ', 'Издержки', 'Итого'),
