@@ -1208,7 +1208,7 @@ server <- function(input, output, session) {
     #   !is.na(market()$counterfeit),
     #   "Данные по доле нелегального розничного оборота недоступны"
     # ))
-    try(counterfeit_plot(market(), opacity=0))
+    counterfeit_plot(market(), opacity=0)
   })
   output$balance_plot <- renderPlotly({
     # validate(need(
