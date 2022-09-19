@@ -4,7 +4,7 @@
 # Sys.setlocale(category = "LC_ALL", locale = "C")
 options(encoding = "UTF-8")
 source('plots.R')
-options(shiny.sanitize.errors = TRUE)
+options(shiny.sanitize.errors = FALSE)
 shiny::addResourcePath("shiny.router", system.file("www", package = "shiny.router"))
 shiny_router_js_src <- file.path("shiny.router", "shiny.router.js")
 shiny_router_script_tag <-
