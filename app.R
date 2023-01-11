@@ -670,7 +670,7 @@ server <- function(input, output, session) {
                           "))
       # Highlighting the page in the menu
       script <- ''
-      for (i in c('prod', 'market', 'counterfeit', 'balance')) {
+      for (i in c('prod', 'market', 'counterfeit', 'balance', 'forecast')) {
         script <- paste(script, 
                         paste("$('[href=", '"', "#!/", i, '"', "]').addClass('unchosen_page'); ", sep = ""), sep="")
       }
@@ -711,7 +711,7 @@ server <- function(input, output, session) {
       $('#choice_markets').css('display', 'block');
                           "))
         script <- ''
-        for (i in c('', 'prod', 'counterfeit', 'balance')) {
+        for (i in c('', 'prod', 'counterfeit', 'balance', 'forecast')) {
           script <- paste(script, 
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
@@ -724,7 +724,7 @@ server <- function(input, output, session) {
       $('#choice_markets').css('display', 'block');
                           "))
         script <- ''
-        for (i in c('', 'prod', 'market', 'balance')) {
+        for (i in c('', 'prod', 'market', 'balance', 'forecast')) {
           script <- paste(script, 
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
@@ -737,12 +737,25 @@ server <- function(input, output, session) {
       $('#choice_markets').css('display', 'block');
                           "))
         script <- ''
-        for (i in c('', 'prod', 'market', 'counterfeit')) {
+        for (i in c('', 'prod', 'market', 'counterfeit', 'forecast')) {
           script <- paste(script, 
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
         shinyjs::runjs(script) 
         shinyjs::runjs(paste("$('[href=", '"', "#!/balance", '"', "]').addClass('chosen_page')", sep = "")) 
+      }
+      if (is_page('forecast')) {
+        shinyjs::runjs(HTML("
+      $('#choice_models').css('display', 'none');
+      $('#choice_markets').css('display', 'block');
+                          "))
+        script <- ''
+        for (i in c('', 'prod', 'market', 'counterfeit', 'balance')) {
+          script <- paste(script, 
+                          paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
+        }
+        shinyjs::runjs(script) 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/forecast", '"', "]').addClass('chosen_page')", sep = "")) 
       }
     }
   })
