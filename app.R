@@ -282,6 +282,12 @@ navigation <- tagList (
         icon = 'PieDouble'
       ),
       list(
+        name = 'Среднесрочный прогноз',
+        url = '#!/forecast ',
+        key = 'forecast',
+        icon = 'Market'
+      ),
+      list(
         name = 'Анализ нелегального оборота',
         url = '#!/counterfeit',
         key = 'counterfeit',
@@ -520,6 +526,35 @@ market_page <- makePage(
     pivot_market,
     style='height:1300px;')
 )
+# Forecast page
+pivot_forecast<- Pivot(overflowBehavior="menu",
+                       PivotItem(headerText = "Прогноз спроса", 
+                                 info_card(text = tags$span("На графике представлена квартальная динамика", tags$b(" фактического и прогнозного уровня розничных продаж (г/г) "), "на рынке. Фактические данные представляют собой значения индекса розничных продаж в реальном выражении для соответствущей товарной группы. 
+                                                           Прогнозные значения рассчитаны с помощью <INSERT SMALL MODEL DESCRIPTION>"),
+                                           toggle_id = NULL,
+                                           display_download=FALSE,
+                                           dropdown = NULL),
+                                 plotlyOutput('fcast_demand')
+                       ),
+                      PivotItem(headerText = "Прогноз ценовой динамики", 
+                                info_card(text = tags$span("На графике представлена квартальная динамика", tags$b(" фактического и прогнозного уровня цен (г/г) "), "на рынке. Фактические данные представляют собой значения индекса потребительских цен для соответствущей товарной группы. 
+                                                           Прогнозные значения рассчитаны с помощью <INSERT SMALL MODEL DESCRIPTION>"),
+                                          toggle_id = NULL,
+                                          display_download=FALSE,
+                                          dropdown = NULL),
+                                plotlyOutput('fcast_prices')
+                      )
+)
+
+forecast_page <- makePage(
+  title = "Среднесрочный прогноз",
+  subtitle = "По данным Росстата",
+  contents = div(
+    # div(class = "cards", cards_market),
+    pivot_forecast,
+    style='height:1300px;')
+)
+
 # counterfeit analysis
 cntf_page <- makePage(
   title = "Анализ нелегального оборота",
@@ -566,6 +601,7 @@ router <- make_router(
   # route("/", home_page),
   route("/", cons_page),
   route('market', market_page),
+  route('forecast', forecast_page),
   route("prod", prod_page),
   route("counterfeit", cntf_page),
   route("balance", balance_page)
@@ -693,7 +729,7 @@ server <- function(input, output, session) {
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
         shinyjs::runjs(script) 
-        shinyjs::runjs(paste("$('[href=", '"', "#!/market", '"', "]').addClass('chosen_page')", sep = "")) 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/counterfeit", '"', "]').addClass('chosen_page')", sep = "")) 
       }
       if (is_page('balance')) {
         shinyjs::runjs(HTML("
@@ -706,7 +742,7 @@ server <- function(input, output, session) {
                           paste("$('[href=", '"', "#!/", i, '"', "]').removeClass('unchosen_page').addClass('unchosen_page'); ", sep = ""), sep="")
         }
         shinyjs::runjs(script) 
-        shinyjs::runjs(paste("$('[href=", '"', "#!/market", '"', "]').addClass('chosen_page')", sep = "")) 
+        shinyjs::runjs(paste("$('[href=", '"', "#!/balance", '"', "]').addClass('chosen_page')", sep = "")) 
       }
     }
   })
@@ -1244,7 +1280,14 @@ server <- function(input, output, session) {
   output$prod_prices <- renderPlotly({
     prod_prices(market())
   })
-
+  # Plot forecast for retail sales
+  output$fcast_prices <- renderPlotly({
+    fcast_prices(market())
+  })
+  # Plot forecast for price
+  output$fcast_demand <- renderPlotly({
+    fcast_demand(market())
+  })
   output$retail <- renderPlotly({
     validate(need(
       !nrow(market()$df_retail)==0,

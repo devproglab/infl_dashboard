@@ -1187,3 +1187,52 @@ counterfeit_plot <- function(data, opacity=0) {
   }
 }
 # colours=c("#e83131", "#ffbfbf", "dark gray", "#c3ffbf","#3AE831"),
+fcast_prices <- function(data) {
+  df <- data$qq_fcast
+  if (!is.null(df)) {
+    df$p_forecast[last(which(!is.na(df$p_observed)))] <- df$p_observed[last(which(!is.na(df$p_observed)))]
+    df$d_forecast[last(which(!is.na(df$p_observed)))] <- df$d_observed[last(which(!is.na(df$p_observed)))]
+    p <- df %>% 
+      select(-c(d_observed, d_forecast)) %>%
+      pivot_longer(-date) %>%
+      ggplot() + 
+      geom_line(aes(x=date, y=value*100, col=name, group=name, text=paste0(ifelse(name=='p_forecast', 'Прогнозируемый', 'Фактический'), ' рост цен, ', as.yearmon(date), ': ', round(value*100,2), '% г/г'),
+      )) +
+      geom_hline(yintercept = 0, size=0.7) +
+      xlab(NULL) +
+      ylab('%') +
+      theme(legend.position='none')
+    p <- ggplotly(p, tooltip='text') %>%
+      config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
+  } else {
+    p <- empty_plot("Среднесрочный прогноз еще не рассчитан", x = 0.5, y=0.5) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                                                                   autosize = T, dragmode=FALSE,  
+                                                                                                   xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  }
+  p
+}
+fcast_demand <- function(data) {
+  df <- data$qq_fcast
+  if (!is.null(df)) {
+    df <- data$qq_fcast
+    df$p_forecast[last(which(!is.na(df$p_observed)))] <- df$p_observed[last(which(!is.na(df$p_observed)))]
+    df$d_forecast[last(which(!is.na(df$p_observed)))] <- df$d_observed[last(which(!is.na(df$p_observed)))]
+    p <- df %>% 
+      select(-c(p_observed, p_forecast)) %>%
+      pivot_longer(-date) %>%
+      ggplot() + 
+      geom_line(aes(x=date, y=value*100, col=name, group=name, text=paste0(ifelse(name=='d_forecast', 'Прогнозируемый', 'Фактический'), ' рост розничных продаж, ', as.yearmon(date), ': ', round(value*100,2), '% г/г'),
+      )) +
+      geom_hline(yintercept = 0, size=0.7) +
+      xlab(NULL) +
+      ylab('%') +
+      theme(legend.position='none')
+    p <- ggplotly(p, tooltip='text') %>%
+      config(displayModeBar = F, locale = 'ru') %>% layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)")
+  } else {
+    p <- empty_plot("Среднесрочный прогноз еще не рассчитан", x = 0.5, y=0.5) %>%  layout(plot_bgcolor  = "rgba(0, 0, 0, 0)", paper_bgcolor = "rgba(0, 0, 0, 0)",
+                                                                                              autosize = T, dragmode=FALSE,  
+                                                                                              xaxis = list(fixedrange = TRUE), yaxis = list(fixedrange = TRUE))
+  }
+  p
+}

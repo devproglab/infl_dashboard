@@ -168,7 +168,7 @@ body {
     pointer-events: none;
 }
 .unchosen_page {
-  background-color: white!important;
+  /*background-color: white!important;*/
   font-weight: 400!important;
 }
 .unchosen_page:after {
