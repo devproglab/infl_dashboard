@@ -27,6 +27,7 @@ labelset[5] <- 'май'
 
 # Prepare list of models
 model_groups <- read_xlsx('data_output/models/model_groups.xlsx')
+
 models <- substr(model_groups$model, 1, nchar(model_groups$model)-6)
 groups_counter <- model_groups %>%
   group_by(group) %>%
@@ -310,6 +311,9 @@ navigation <- tagList (
     )
   ),
   Text('Анализируемые товары:', variant='large'),
+  HTML("<span style='margin-top:5px'>
+       <img src='Untitled.svg' width='20px' height='20px' style='display:inline-block; vertical-align: -50%;'> - маркируются системой \"Честный знак\"
+       </span>"),
   htmlOutput('sidebar_choice')
 )
 
@@ -359,9 +363,11 @@ pivot_consumer <- Pivot(
                                        tags$p(), 'Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.',
                                        tags$p(), 'Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. 
                                        Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта.',
-                                       tags$p(), 'Подробное описание используемых в анализе факторов доступно в разделе "Пояснения к факторам"'),
+                                       tags$p()
+                                       # , 'Подробное описание используемых в анализе факторов доступно в разделе "Пояснения к факторам"'
+                                       ),
                       download_id = "download_yearly",
-                      panel = TRUE),
+                      panel = FALSE),
             tags$div(
               tags$div(plotlyOutput('price_yoy'), style='flex-basis: 70%;'),
               tags$div(tableOutput('impacts')),
@@ -373,9 +379,11 @@ pivot_consumer <- Pivot(
                                        tags$p(), 'Под инфляцией спроса понимается изменение динамики спроса на товар, а также влияние общеинфляционных тенденций в экономике на изменение его цены.',
                                        tags$p(), 'Затемненная область соответствует прогнозным значениям, полученным на основе построенной статистической модели. 
                                        Для прогнозов также приводятся доверительные интервалы, обозначающие диапазон, в котором наиболее вероятно будет находиться значение инфляции для выбранного продукта.',
-                                       tags$p(), 'Подробное описание используемых в анализе факторов доступно в разделе "Пояснения к факторам"'),
+                                       tags$p()
+                                       # , 'Подробное описание используемых в анализе факторов доступно в разделе "Пояснения к факторам"'
+                                       ),
                       download_id = "download_monthly",
-                      panel = TRUE),
+                      panel = FALSE),
             plotlyOutput('price_mom')
   ),
   PivotItem(headerText = "Структура розничной цены", 
@@ -614,6 +622,8 @@ ui <- fluentPage(
     tags$script(src='tooltiper.js', type="text/javascript"),
     # tags$link(href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/7.2.0/css/fabric.min.css"),
     tags$link(href = "style.css", rel = "stylesheet", type = "text/css"),
+    tags$link(href = "style_marking1.css", rel = "stylesheet", type = "text/css"),
+    tags$link(href = "style_marking2.css", rel = "stylesheet", type = "text/css"),
     tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css"),
     shiny_router_script_tag,
   ),
@@ -639,7 +649,7 @@ server <- function(input, output, session) {
           selectionMode = 0,
           onShouldVirtualize = FALSE,
           onRenderCell = JS("(depth, item) => (
-        jsmodule['react'].createElement('div', { className : 'model_choice', style: { paddingLeft: 20 }, label: item, onClick : () => {Shiny.setInputValue('prod_select', item) } }, item)
+        jsmodule['react'].createElement('div', { className : 'model_choice marking_id', style: { paddingLeft: 20 }, label: item, onClick : () => {Shiny.setInputValue('prod_select', item) } }, item)
       )")),
         div(
           textInput('prod_select', label = NULL, value = models[1]),
@@ -652,7 +662,7 @@ server <- function(input, output, session) {
         selectionMode = 0,
         onShouldVirtualize = FALSE,
         onRenderCell = JS("(depth, item) => (
-        jsmodule['react'].createElement('div', { className : 'market_choice', style: { paddingLeft: 20 }, label: item, onClick : () => {Shiny.setInputValue('market_select', item) } }, item)
+        jsmodule['react'].createElement('div', { className : 'market_choice marking_id', style: { paddingLeft: 20 }, label: item, onClick : () => {Shiny.setInputValue('market_select', item) } }, item)
       )")
       ),
       div(
@@ -1002,8 +1012,10 @@ server <- function(input, output, session) {
         ed=='Тысяча штук' ~ 'тыс. шт.',
         ed=='литр' ~ 'л.',
         ed=='Тонна;^метрическая тонна (1000 кг)' ~ 'т.',
-        ed=='Декалитр' ~ 'дал'
-      )
+        ed=='Декалитр' ~ 'дал',
+        ed=='Штука' ~ 'шт.',
+        ed=='Пара (2 шт.)' ~ 'пара'
+        )
       ed_tradeprice <- data$ed_tradeprice
       rub <- '\U20BD'
       pp_dataset <- data$prod_price %>%
@@ -1295,11 +1307,19 @@ server <- function(input, output, session) {
   })
   # Plot forecast for retail sales
   output$fcast_prices <- renderPlotly({
-    fcast_prices(market())
+    validate(need(
+      !nrow(market()$qq_fcast)==0,
+      "Прогноз по данной товарной группе недоступен"
+    ))
+    try(fcast_prices(market()))
   })
   # Plot forecast for price
   output$fcast_demand <- renderPlotly({
-    fcast_demand(market())
+    validate(need(
+      !nrow(market()$qq_fcast)==0,
+      "Прогноз по данной товарной группе недоступен"
+    ))
+    try(fcast_demand(market()))
   })
   output$retail <- renderPlotly({
     validate(need(
